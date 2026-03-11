@@ -1,6 +1,5 @@
 #ifndef METRICS_H
 #define METRICS_H
-
 #include "process.h"
 
 typedef struct {

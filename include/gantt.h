@@ -1,6 +1,5 @@
 #ifndef GANTT_H
 #define GANTT_H
-
 #include "process.h"
 
 typedef struct GanttSegment {
