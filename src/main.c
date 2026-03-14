@@ -6,6 +6,7 @@
 #include "scheduler.h"
 #include "metrics.h"
 #include "gantt.h"
+#include "utils.h"
 #define MAX_PROCESSES 100
 
 char* input_filename = NULL;
@@ -78,12 +79,6 @@ int load_processes(const char* filename, Process* processes) {
     return count;
 }
 
-void reset_processes(Process* dest, const Process* src, int count) {
-    for (int i = 0; i < count; i++) {
-        dest[i] = src[i];
-    }
-}
-
 int main(int argc, char* argv[]) {
     parse_arguments(argc, argv);
 
@@ -103,7 +98,7 @@ int main(int argc, char* argv[]) {
 
     if (run_fcfs || run_all) {
         printf("\n Running First-Come, First-Served (FCFS) \n");
-        reset_processes(current_processes, original_processes, num_processes);
+        copy_process_array(current_processes, original_processes, num_processes);
         simulate_fcfs(current_processes, num_processes);
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "FCFS");
         print_metrics(&metrics_array[metrics_count]);
@@ -112,7 +107,7 @@ int main(int argc, char* argv[]) {
 
     if (run_sjf || run_all) {
         printf("\n Running Shortest Job First (SJF) \n");
-        reset_processes(current_processes, original_processes, num_processes);
+        copy_process_array(current_processes, original_processes, num_processes);
         simulate_sjf(current_processes, num_processes);
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "SJF");
         print_metrics(&metrics_array[metrics_count]);
@@ -121,7 +116,7 @@ int main(int argc, char* argv[]) {
 
     if (run_stcf || run_all) {
         printf("\n Running Shortest Time-to-Completion First (STCF) \n");
-        reset_processes(current_processes, original_processes, num_processes);
+        copy_process_array(current_processes, original_processes, num_processes);
         simulate_stcf(current_processes, num_processes);
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "STCF");
         print_metrics(&metrics_array[metrics_count]);
@@ -130,7 +125,7 @@ int main(int argc, char* argv[]) {
 
     if (run_rr || run_all) {
         printf("\n Running Round Robin (RR) [Quantum = %d] \n", time_quantum);
-        reset_processes(current_processes, original_processes, num_processes);
+        copy_process_array(current_processes, original_processes, num_processes);
         simulate_rr(current_processes, num_processes, time_quantum);
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "RR");
         print_metrics(&metrics_array[metrics_count]);
@@ -139,7 +134,7 @@ int main(int argc, char* argv[]) {
 
     if (run_mlfq || run_all) {
         printf("\n Running Multi-Level Feedback Queue (MLFQ) \n");
-        reset_processes(current_processes, original_processes, num_processes);
+        copy_process_array(current_processes, original_processes, num_processes);
 
         int quantums[] = {2, 4, 8};
         MLFQ_Config mlfq_config = { .num_queues = 3, .time_quantums = quantums, .boost_interval = 20 };

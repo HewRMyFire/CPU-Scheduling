@@ -3,13 +3,7 @@
 #include "scheduler.h"
 #include "process.h"
 #include "gantt.h"
-
-static int compare_arrival_time(const void* a, const void* b) {
-    Process* p1 = (Process*)a;
-    Process* p2 = (Process*)b;
-
-    return p1->arrival_time - p2->arrival_time;
-}
+#include "utils.h"
 
 void simulate_sjf(Process* processes, int num_processes) {
     if (num_processes <= 0) return;

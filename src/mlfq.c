@@ -3,6 +3,7 @@
 #include "scheduler.h"
 #include "process.h"
 #include "gantt.h"
+#include "utils.h"
 
 typedef struct {
     Process** procs;
@@ -13,7 +14,7 @@ typedef struct {
 } MLFQ_Queue;
 
 static void init_queue(MLFQ_Queue* q, int cap) {
-    q->procs = (Process**)malloc(cap * sizeof(Process*));
+    q->procs = (Process**)safe_malloc(cap * sizeof(Process*));
     q->front = 0;
     q->rear = 0;
     q->size = 0;
@@ -37,15 +38,6 @@ static void free_queue(MLFQ_Queue* q) {
     free(q->procs);
 }
 
-static int compare_arrival_time(const void* a, const void* b) {
-    Process* p1 = (Process*)a;
-    Process* p2 = (Process*)b;
-    if (p1->arrival_time != p2->arrival_time) {
-        return p1->arrival_time - p2->arrival_time;
-    }
-    return 0;
-}
-
 void simulate_mlfq(Process* processes, int num_processes, MLFQ_Config* config) {
     if (num_processes <= 0) return;
 
@@ -56,7 +48,7 @@ void simulate_mlfq(Process* processes, int num_processes, MLFQ_Config* config) {
     int last_boost_time = 0;
     int idx = 0;
 
-    MLFQ_Queue* queues = (MLFQ_Queue*)malloc(config->num_queues * sizeof(MLFQ_Queue));
+    MLFQ_Queue* queues = (MLFQ_Queue*)safe_malloc(config->num_queues * sizeof(MLFQ_Queue));
     for (int i = 0; i < config->num_queues; i++) {
         init_queue(&queues[i], num_processes);
     }
@@ -109,18 +101,16 @@ void simulate_mlfq(Process* processes, int num_processes, MLFQ_Config* config) {
         int time_allotment = config->time_quantums[selected_q];
         int run_time = p->remaining_time;
 
-        if (time_allotment < run_time) {
-            run_time = time_allotment;
-        }
+        run_time = util_min(run_time, time_allotment);
 
         int time_to_next_arrival = (idx < num_processes) ? (processes[idx].arrival_time - current_time) : 999999;
-        if (selected_q > 0 && time_to_next_arrival < run_time) {
-            run_time = time_to_next_arrival;
+        if (selected_q > 0) {
+            run_time = util_min(run_time, time_to_next_arrival);
         }
 
         int time_to_boost = (last_boost_time + config->boost_interval) - current_time;
-        if (time_to_boost > 0 && time_to_boost < run_time) {
-            run_time = time_to_boost;
+        if (time_to_boost > 0) {
+            run_time = util_min(run_time, time_to_boost);
         }
 
         int start = current_time;

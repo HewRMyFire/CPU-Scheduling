@@ -3,16 +3,7 @@
 #include "scheduler.h"
 #include "process.h"
 #include "gantt.h"
-
-static int compare_arrival_time(const void* a, const void* b) {
-    Process* p1 = (Process*)a;
-    Process* p2 = (Process*)b;
-
-    if (p1->arrival_time != p2->arrival_time) {
-        return p1->arrival_time - p2->arrival_time;
-    }
-    return 0;
-}
+#include "utils.h"
 
 void simulate_rr(Process* processes, int num_processes, int time_quantum) {
     if (num_processes <= 0) return;
@@ -22,9 +13,10 @@ void simulate_rr(Process* processes, int num_processes, int time_quantum) {
     int current_time = 0;
     int completed = 0;
 
-    int* in_queue = (int*)calloc(num_processes, sizeof(int));
+    int* in_queue = (int*)safe_malloc(num_processes * sizeof(int));
+    for (int i = 0; i < num_processes; i++) in_queue[i] = 0;
 
-    Process** queue = (Process**)malloc(num_processes * sizeof(Process*));
+    Process** queue = (Process**)safe_malloc(num_processes * sizeof(Process*));
     int front = 0, rear = 0, q_size = 0;
 
     GanttChart chart;
@@ -68,7 +60,7 @@ void simulate_rr(Process* processes, int num_processes, int time_quantum) {
             p->state = STATE_RUNNING;
         }
 
-        int exec_time = (p->remaining_time > time_quantum) ? time_quantum : p->remaining_time;
+        int exec_time = util_min(p->remaining_time, time_quantum);
         int start = current_time;
 
         current_time += exec_time;

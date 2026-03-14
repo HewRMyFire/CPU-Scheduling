@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "gantt.h"
+#include "utils.h"
 
 void init_gantt_chart(GanttChart* chart) {
     if (chart != NULL) {
@@ -18,11 +19,7 @@ void add_gantt_segment(GanttChart* chart, const char* pid, int start_time, int e
         return;
     }
 
-    GanttSegment* new_seg = (GanttSegment*)malloc(sizeof(GanttSegment));
-    if (new_seg == NULL) {
-        perror("Failed to allocate memory for GanttSegment");
-        exit(EXIT_FAILURE);
-    }
+    GanttSegment* new_seg = (GanttSegment*)safe_malloc(sizeof(GanttSegment));
 
     strncpy(new_seg->pid, pid, sizeof(new_seg->pid) - 1);
     new_seg->pid[sizeof(new_seg->pid) - 1] = '\0';
