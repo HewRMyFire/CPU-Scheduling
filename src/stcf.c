@@ -1,70 +1,66 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "scheduler.h"
+#include "process.h"
+#include "gantt.h"
 
-#define MAX 100
+static int compare_arrival_time(const void* a, const void* b) {
+    Process* p1 = (Process*)a;
+    Process* p2 = (Process*)b;
 
-typedef struct {
-    char pid;
-    int arrival;
-    int burst;
-    int remaining;
-    int completion;
-} Process;
-
-int main() {
-    Process p[MAX];
-    int n = 0;
-
-    printf("Enter processes (PID Arrival Burst). Press Ctrl+D to stop.\n");
-
-    while (scanf(" %c %d %d", &p[n].pid, &p[n].arrival, &p[n].burst) == 3) {
-        p[n].remaining = p[n].burst;
-        n++;
+    if (p1->arrival_time != p2->arrival_time) {
+        return p1->arrival_time - p2->arrival_time;
     }
+    return 0;
+}
 
+void simulate_stcf(Process* processes, int num_processes) {
+    if (num_processes <= 0) return;
+
+    qsort(processes, num_processes, sizeof(Process), compare_arrival_time);
+
+    int current_time = 0;
     int completed = 0;
-    int time = 0;
-    int shortest = -1;
 
-    while (completed < n) {
-        shortest = -1;
+    GanttChart chart;
+    init_gantt_chart(&chart);
 
-        for (int i = 0; i < n; i++) {
-            if (p[i].arrival <= time && p[i].remaining > 0) {
-                if (shortest == -1 || p[i].remaining < p[shortest].remaining) {
+    while (completed < num_processes) {
+        int shortest = -1;
+
+        for (int i = 0; i < num_processes; i++) {
+            if (processes[i].arrival_time <= current_time && processes[i].state != STATE_FINISHED) {
+                if (shortest == -1 || processes[i].remaining_time < processes[shortest].remaining_time) {
                     shortest = i;
                 }
             }
         }
 
         if (shortest == -1) {
-            time++;
+            add_gantt_segment(&chart, "IDLE", current_time, current_time + 1);
+            current_time++;
             continue;
         }
 
-        p[shortest].remaining--;
-        time++;
+        Process* p = &processes[shortest];
 
-        if (p[shortest].remaining == 0) {
-            p[shortest].completion = time;
+        if (p->start_time == -1) {
+            p->start_time = current_time;
+        }
+        p->state = STATE_RUNNING;
+
+        add_gantt_segment(&chart, p->pid, current_time, current_time + 1);
+        p->remaining_time--;
+        current_time++;
+
+        if (p->remaining_time == 0) {
+            p->completion_time = current_time;
+            p->state = STATE_FINISHED;
             completed++;
         }
     }
 
-    printf("\nPID\tArrival\tBurst\tCompletion\tTurnaround\tWaiting\n");
-
-    for (int i = 0; i < n; i++) {
-        int turnaround = p[i].completion - p[i].arrival;
-        int waiting = turnaround - p[i].burst;
-
-        printf("%c\t%d\t%d\t%d\t\t%d\t\t%d\n",
-                p[i].pid,
-                p[i].arrival,
-                p[i].burst,
-                p[i].completion,
-                turnaround,
-                waiting);
-    }
-
-    return 0;
+    printf("\nSTCF Gantt Chart:\n");
+    print_gantt_chart(&chart);
+    free_gantt_chart(&chart);
 }
