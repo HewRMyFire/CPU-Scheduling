@@ -1,53 +1,63 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include "scheduler.h"
-#include "utils.h"
 
-int schedule_sjf(SchedulerState *state) {
-    if (!state || !state->processes || state->num_processes <= 0) return -1;
+static void enqueue_sjf(SchedulerState *state, Process *p) {
+    int i;
+    for (i = 0; i < state->rq_size; i++) {
+        int idx = (state->rq_front + i) % state->num_processes;
+        if (state->ready_queue[idx]->burst_time > p->burst_time) break;
+    }
+    for (int j = state->rq_size; j > i; j--) {
+        state->ready_queue[(state->rq_front + j) % state->num_processes] = 
+            state->ready_queue[(state->rq_front + j - 1) % state->num_processes];
+    }
+    state->ready_queue[(state->rq_front + i) % state->num_processes] = p;
+    state->rq_rear = (state->rq_front + state->rq_size + 1) % state->num_processes;
+    state->rq_size++;
+}
 
-    init_gantt_chart(&state->chart);
-    state->current_time = 0;
-    int completed = 0;
+static void dispatch_sjf(SchedulerState *state) {
+    if (state->current_running == NULL && state->rq_size > 0) {
+        Process *p = state->ready_queue[state->rq_front];
+        state->rq_front = (state->rq_front + 1) % state->num_processes;
+        state->rq_size--;
 
-    while (completed < state->num_processes) {
-        int shortest = -1;
-        for (int i = 0; i < state->num_processes; i++) {
-            if (state->processes[i].arrival_time <= state->current_time && state->processes[i].state != STATE_FINISHED) {
-                if (shortest == -1 || state->processes[i].burst_time < state->processes[shortest].burst_time) {
-                    shortest = i;
-                }
-            }
-        }
-
-        if (shortest == -1) {
-            int next_arrival = -1;
-            for (int i = 0; i < state->num_processes; i++) {
-                if (state->processes[i].state != STATE_FINISHED) {
-                    if (next_arrival == -1 || state->processes[i].arrival_time < next_arrival) {
-                        next_arrival = state->processes[i].arrival_time;
-                    }
-                }
-            }
-            add_gantt_segment(&state->chart, "IDLE", state->current_time, next_arrival);
-            state->current_time = next_arrival;
-            continue;
-        }
-
-        Process *p = &state->processes[shortest];
-        p->start_time = state->current_time;
+        state->current_running = p;
+        if (p->start_time == -1) p->start_time = state->current_time;
         p->state = STATE_RUNNING;
         
-        add_gantt_segment(&state->chart, p->pid, state->current_time, state->current_time + p->burst_time);
-
-        state->current_time += p->burst_time;
-        p->remaining_time = 0;
-        p->finish_time = state->current_time;
-        p->state = STATE_FINISHED;
-        completed++;
+        push_event(&state->event_queue, state->current_time + p->burst_time, EVENT_COMPLETION, p);
     }
+}
 
+int schedule_sjf(SchedulerState *state) {
+    state->current_time = 0; state->event_queue = NULL; state->current_running = NULL;
+    state->ready_queue = (Process **)malloc(state->num_processes * sizeof(Process *));
+    state->rq_front = 0; state->rq_rear = 0; state->rq_size = 0;
+    init_gantt_chart(&state->chart);
+
+    for (int i = 0; i < state->num_processes; i++) push_event(&state->event_queue, state->processes[i].arrival_time, EVENT_ARRIVAL, &state->processes[i]);
+
+    while (state->event_queue != NULL) {
+        Event *evt = pop_event(&state->event_queue);
+        if (state->current_time < evt->time) {
+            add_gantt_segment(&state->chart, state->current_running ? state->current_running->pid : "IDLE", state->current_time, evt->time);
+            state->current_time = evt->time;
+        }
+
+        if (evt->type == EVENT_ARRIVAL) {
+            enqueue_sjf(state, evt->process);
+            dispatch_sjf(state);
+        } else if (evt->type == EVENT_COMPLETION) {
+            evt->process->finish_time = state->current_time;
+            evt->process->state = STATE_FINISHED;
+            evt->process->remaining_time = 0;
+            state->current_running = NULL;
+            dispatch_sjf(state);
+        }
+        free(evt);
+    }
     print_gantt_chart(&state->chart);
-    free_gantt_chart(&state->chart);
+    free(state->ready_queue); free_gantt_chart(&state->chart);
     return 0;
 }

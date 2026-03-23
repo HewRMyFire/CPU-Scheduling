@@ -1,75 +1,76 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "scheduler.h"
-#include "utils.h"
 
-#define MAX_LOGS 1000
+static void enqueue_stcf(SchedulerState *state, Process *p) {
+    int i;
+    for (i = 0; i < state->rq_size; i++) {
+        int idx = (state->rq_front + i) % state->num_processes;
+        if (state->ready_queue[idx]->remaining_time > p->remaining_time) break;
+    }
+    for (int j = state->rq_size; j > i; j--) {
+        state->ready_queue[(state->rq_front + j) % state->num_processes] = 
+            state->ready_queue[(state->rq_front + j - 1) % state->num_processes];
+    }
+    state->ready_queue[(state->rq_front + i) % state->num_processes] = p;
+    state->rq_rear = (state->rq_front + state->rq_size + 1) % state->num_processes;
+    state->rq_size++;
+}
 
-int schedule_stcf(SchedulerState *state) {
-    if (!state || !state->processes || state->num_processes <= 0) return -1;
+static void dispatch_stcf(SchedulerState *state) {
+    if (state->current_running == NULL && state->rq_size > 0) {
+        Process *p = state->ready_queue[state->rq_front];
+        state->rq_front = (state->rq_front + 1) % state->num_processes;
+        state->rq_size--;
 
-    qsort(state->processes, state->num_processes, sizeof(Process), compare_arrival_time);
-    init_gantt_chart(&state->chart);
-    state->current_time = 0;
-    
-    int completed = 0;
-    int prev_shortest = -1;
-    char preemption_logs[MAX_LOGS][128];
-    int log_count = 0;
-
-    while (completed < state->num_processes) {
-        int shortest = -1;
-
-        for (int i = 0; i < state->num_processes; i++) {
-            if (state->processes[i].arrival_time <= state->current_time && state->processes[i].state != STATE_FINISHED) {
-                if (shortest == -1 || state->processes[i].remaining_time < state->processes[shortest].remaining_time) {
-                    shortest = i;
-                }
-            }
-        }
-
-        if (shortest == -1) {
-            add_gantt_segment(&state->chart, "IDLE", state->current_time, state->current_time + 1);
-            state->current_time++;
-            prev_shortest = -1;
-            continue;
-        }
-
-        Process* p = &state->processes[shortest];
-
-        if (prev_shortest != -1 && prev_shortest != shortest) {
-            Process* prev_p = &state->processes[prev_shortest];
-            if (prev_p->state != STATE_FINISHED && prev_p->remaining_time > 0) {
-                if (log_count < MAX_LOGS) sprintf(preemption_logs[log_count++], "Process %s was preempted at t=%d (remaining: %d)", prev_p->pid, state->current_time, prev_p->remaining_time);
-            }
-        }
-
-        if (p->start_time != -1 && prev_shortest != shortest && state->current_time > p->start_time) {
-            if (log_count < MAX_LOGS) sprintf(preemption_logs[log_count++], "Process %s resumed at t=%d", p->pid, state->current_time);
-        }
-
+        state->current_running = p;
         if (p->start_time == -1) p->start_time = state->current_time;
         p->state = STATE_RUNNING;
-
-        add_gantt_segment(&state->chart, p->pid, state->current_time, state->current_time + 1);
+        p->quantum_used = state->current_time;
         
-        p->remaining_time--;
-        state->current_time++;
+        push_event(&state->event_queue, state->current_time + p->remaining_time, EVENT_COMPLETION, p);
+    }
+}
 
-        if (p->remaining_time == 0) {
-            p->finish_time = state->current_time;
-            p->state = STATE_FINISHED;
-            completed++;
+int schedule_stcf(SchedulerState *state) {
+    state->current_time = 0; state->event_queue = NULL; state->current_running = NULL;
+    state->ready_queue = (Process **)malloc(state->num_processes * sizeof(Process *));
+    state->rq_front = 0; state->rq_rear = 0; state->rq_size = 0;
+    init_gantt_chart(&state->chart);
+
+    for (int i = 0; i < state->num_processes; i++) push_event(&state->event_queue, state->processes[i].arrival_time, EVENT_ARRIVAL, &state->processes[i]);
+
+    while (state->event_queue != NULL) {
+        Event *evt = pop_event(&state->event_queue);
+        if (state->current_time < evt->time) {
+            add_gantt_segment(&state->chart, state->current_running ? state->current_running->pid : "IDLE", state->current_time, evt->time);
+            state->current_time = evt->time;
         }
-        prev_shortest = shortest;
-    }
 
-    print_gantt_chart(&state->chart);
-    if (log_count > 0) {
-        for (int i = 0; i < log_count; i++) printf("%s\n", preemption_logs[i]);
-        printf("\n");
+        if (evt->type == EVENT_ARRIVAL) {
+            if (state->current_running) {
+                int elapsed = state->current_time - state->current_running->quantum_used;
+                int current_rem = state->current_running->remaining_time - elapsed;
+
+                if (evt->process->remaining_time < current_rem) {
+                    cancel_process_events(&state->event_queue, state->current_running);
+                    state->current_running->remaining_time = current_rem;
+                    enqueue_stcf(state, state->current_running);
+                    state->current_running = NULL;
+                }
+            }
+            enqueue_stcf(state, evt->process);
+            dispatch_stcf(state);
+            
+        } else if (evt->type == EVENT_COMPLETION) {
+            evt->process->finish_time = state->current_time;
+            evt->process->state = STATE_FINISHED;
+            evt->process->remaining_time = 0;
+            state->current_running = NULL;
+            dispatch_stcf(state);
+        }
+        free(evt);
     }
-    free_gantt_chart(&state->chart);
+    print_gantt_chart(&state->chart);
+    free(state->ready_queue); free_gantt_chart(&state->chart);
     return 0;
 }
