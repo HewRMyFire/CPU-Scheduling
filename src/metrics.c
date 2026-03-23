@@ -51,14 +51,41 @@ void calculate_metrics(SchedulingMetrics* metrics, Process* processes, int num_p
     }
 }
 
-void print_metrics(const SchedulingMetrics* metrics) {
-    printf("--- Metrics for %s ---\n", metrics->algorithm_name);
-    printf("Average Turnaround Time : %.2f\n", metrics->avg_turnaround_time);
-    printf("Average Waiting Time    : %.2f\n", metrics->avg_waiting_time);
-    printf("Average Response Time   : %.2f\n", metrics->avg_response_time);
-    printf("CPU Utilization         : %.2f%%\n", metrics->cpu_utilization);
-    printf("Throughput              : %.4f processes/unit time\n", metrics->throughput);
-    printf("----------------------------\n");
+void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
+    printf("=== Metrics ===\n");
+    printf("Process | AT  | BT  | FT  | TT  | WT  | RT  \n");
+    printf("--------|-----|-----|-----|-----|-----|-----\n");
+
+    int convoy_detected = 0;
+    char convoy_pid[16] = "";
+    int convoy_wait_time = 0;
+
+    for (int i = 0; i < metrics->num_processes; i++) {
+        Process* p = &processes[i];
+        int tt = p->completion_time - p->arrival_time;
+        int wt = tt - p->burst_time;
+        int rt = p->start_time - p->arrival_time;
+
+        if (wt < 0) wt = 0; 
+
+        printf("%-7s | %-3d | %-3d | %-3d | %-3d | %-3d | %-3d\n",
+               p->pid, p->arrival_time, p->burst_time, 
+               p->completion_time, tt, wt, rt);
+
+        if (wt > p->burst_time && wt > convoy_wait_time && p->burst_time > 0) {
+            convoy_detected = 1;
+            strcpy(convoy_pid, p->pid);
+            convoy_wait_time = wt;
+        }
+    }
+
+    printf("--------|-----|-----|-----|-----|-----|-----\n");
+    printf("Average |     |     |     | %-3.0f | %-3.0f | %-3.0f\n\n", 
+           metrics->avg_turnaround_time, metrics->avg_waiting_time, metrics->avg_response_time);
+
+    if (convoy_detected && strcmp(metrics->algorithm_name, "FCFS") == 0) {
+        printf("Convoy effect detected: Process %s waited %d time units\n\n", convoy_pid, convoy_wait_time);
+    }
 }
 
 void print_comparative_analysis(const SchedulingMetrics* metrics_array, int num_algorithms) {

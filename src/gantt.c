@@ -42,32 +42,29 @@ void print_gantt_chart(const GanttChart* chart) {
         return;
     }
 
+    printf("=== Gantt Chart ===\n");
+
     GanttSegment* current = chart->head;
-
     while (current != NULL) {
-        printf("---------");
+        printf("[%s", current->pid);
+
+        int duration = current->end_time - current->start_time;
+        int dashes = duration / 15; 
+        if (dashes < 3) dashes = 3;
+        if (dashes > 15) dashes = 15;
+        
+        for(int i = 0; i < dashes; i++) {
+            printf("-");
+        }
+        printf("]");
         current = current->next;
     }
-    printf("-\n");
+    printf("\n");
 
     current = chart->head;
+    printf("Time: %-8d", current->start_time);
     while (current != NULL) {
-        printf("| %-5s ", current->pid);
-        current = current->next;
-    }
-    printf("|\n");
-
-    current = chart->head;
-    while (current != NULL) {
-        printf("---------");
-        current = current->next;
-    }
-    printf("-\n");
-
-    current = chart->head;
-    printf("%-9d", current->start_time);
-    while (current != NULL) {
-        printf("%-9d", current->end_time);
+        printf(" %-8d", current->end_time);
         current = current->next;
     }
     printf("\n");

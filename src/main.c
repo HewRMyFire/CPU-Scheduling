@@ -19,6 +19,7 @@ void print_usage(const char* prog_name) {
     printf("Options:\n");
     printf("  --algorithm=<name>   Specify algorithm (FCFS, SJF, STCF, RR, MLFQ, ALL)\n");
     printf("  --processes=<str>    Inline processes format 'PID:Arrival:Burst,...'\n");
+    printf("  --input=<file>       Specify the input file containing process workloads (alias for -f)\n");
     printf("  -f <file>            Specify the input file containing process workloads\n");
     printf("  -q <int>             Time quantum for Round Robin (Default: 2)\n");
 }
@@ -76,10 +77,11 @@ int main(int argc, char* argv[]) {
     static struct option long_options[] = {
         {"algorithm", required_argument, 0, 'a'},
         {"processes", required_argument, 0, 'p'},
+        {"input", required_argument, 0, 'i'},
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv, "f:q:h", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:q:hi:", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'a':
                 if (strcmp(optarg, "FCFS") == 0) run_fcfs = 1;
@@ -92,6 +94,7 @@ int main(int argc, char* argv[]) {
             case 'p':
                 num_processes = load_processes_from_string(optarg, original_processes);
                 break;
+            case 'i':
             case 'f': 
                 num_processes = load_processes_from_file(optarg, original_processes); 
                 break;
@@ -112,22 +115,22 @@ int main(int argc, char* argv[]) {
     int metrics_count = 0;
 
     if (run_fcfs || run_all) {
-        printf("\n Running First-Come, First-Served (FCFS) \n");
+        printf("\nRunning FCFS Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
         simulate_fcfs(current_processes, num_processes);
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "FCFS");
-        print_metrics(&metrics_array[metrics_count]);
+        print_metrics(&metrics_array[metrics_count], current_processes);
         metrics_count++;
     }
 
     if (run_mlfq || run_all) {
-        printf("\n Running Multi-Level Feedback Queue (MLFQ) \n");
+        printf("\nRunning Multi-Level Feedback Queue (MLFQ)...\n");
         copy_process_array(current_processes, original_processes, num_processes);
         int quantums[] = {2, 4, 8};
         MLFQ_Config mlfq_config = { .num_queues = 3, .time_quantums = quantums, .boost_interval = 20 };
         simulate_mlfq(current_processes, num_processes, &mlfq_config);
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "MLFQ");
-        print_metrics(&metrics_array[metrics_count]);
+        print_metrics(&metrics_array[metrics_count], current_processes);
         metrics_count++;
     }
 

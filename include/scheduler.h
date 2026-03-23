@@ -1,7 +1,6 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 #include "process.h"
-//#include "event.h"
 
 typedef struct {
     int num_queues;

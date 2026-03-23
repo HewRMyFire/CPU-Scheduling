@@ -22,7 +22,7 @@ typedef struct {
 
 void calculate_metrics(SchedulingMetrics* metrics, Process* processes, int num_processes, const char* algo_name);
 
-void print_metrics(const SchedulingMetrics* metrics);
+void print_metrics(const SchedulingMetrics* metrics, Process* processes);
 
 void print_comparative_analysis(const SchedulingMetrics* metrics_array, int num_algorithms);
 
