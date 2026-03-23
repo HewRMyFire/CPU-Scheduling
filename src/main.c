@@ -8,6 +8,7 @@
 #include "metrics.h"
 #include "gantt.h"
 #include "utils.h"
+#include "parser.h"
 
 #define MAX_PROCESSES 100
 
@@ -24,83 +25,6 @@ void print_usage(const char* prog_name) {
     printf("  --quantum=<int>      Time quantum for Round Robin (Default: 30)\n");
     printf("  -f <file>            Specify input file containing process workloads\n");
     printf("  -q <int>             Time quantum for Round Robin\n");
-}
-
-int load_processes_from_file(const char* filename, Process* processes) {
-    FILE* file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening input file");
-        exit(EXIT_FAILURE);
-    }
-
-    char line[256];
-    int count = 0;
-
-    while (fgets(line, sizeof(line), file)) {
-        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') continue;
-
-        char pid[16];
-        int arrival, burst;
-        if (sscanf(line, "%15s %d %d", pid, &arrival, &burst) == 3) {
-            if (count >= MAX_PROCESSES) break;
-            init_process(&processes[count], pid, arrival, burst);
-            count++;
-        }
-    }
-
-    fclose(file);
-    return count;
-}
-
-int load_processes_from_string(char* str, Process* processes) {
-    int count = 0;
-    char* token = strtok(str, ",");
-    
-    while (token != NULL) {
-        char pid[16];
-        int arrival, burst;
-        if (sscanf(token, "%15[^:]:%d:%d", pid, &arrival, &burst) == 3) {
-            if (count >= MAX_PROCESSES) break;
-            init_process(&processes[count], pid, arrival, burst);
-            count++;
-        }
-        token = strtok(NULL, ",");
-    }
-    return count;
-}
-
-int load_mlfq_config(const char* filename, MLFQ_Config* config) {
-    FILE* file = fopen(filename, "r");
-    if (!file) return 0;
-    
-    int q_count = 0;
-    char line[256];
-    
-    while(fgets(line, sizeof(line), file)) {
-        if(line[0] == 'Q' && line[1] >= '0' && line[1] <= '9') q_count++;
-    }
-    
-    config->num_queues = q_count;
-    config->time_quantums = (int*)malloc(q_count * sizeof(int));
-    config->allotments = (int*)malloc(q_count * sizeof(int));
-    
-    rewind(file);
-    while(fgets(line, sizeof(line), file)) {
-        if (line[0] == '#' || line[0] == '\n') continue;
-        if (strncmp(line, "BOOST_PERIOD", 12) == 0) {
-            sscanf(line, "BOOST_PERIOD %d", &config->boost_interval);
-        } else if (line[0] == 'Q') {
-            int qid, tq, allmt;
-            if (sscanf(line, "Q%d %d %d", &qid, &tq, &allmt) == 3) {
-                if (qid < q_count) {
-                    config->time_quantums[qid] = tq;
-                    config->allotments[qid] = allmt;
-                }
-            }
-        }
-    }
-    fclose(file);
-    return 1;
 }
 
 int main(int argc, char* argv[]) {
@@ -130,9 +54,13 @@ int main(int argc, char* argv[]) {
                 else if (strcmp(optarg, "MLFQ") == 0) run_mlfq = 1;
                 else if (strcmp(optarg, "ALL") == 0) run_all = 1;
                 break;
-            case 'p': num_processes = load_processes_from_string(optarg, original_processes); break;
+            case 'p': 
+                num_processes = load_processes_from_string(optarg, original_processes, MAX_PROCESSES); 
+                break;
             case 'i': 
-            case 'f': num_processes = load_processes_from_file(optarg, original_processes); break;
+            case 'f': 
+                num_processes = load_processes_from_file(optarg, original_processes, MAX_PROCESSES); 
+                break;
             case 'q': time_quantum = atoi(optarg); break;
             case 'm': strncpy(mlfq_config_file, optarg, 255); break;
             case 'h': print_usage(argv[0]); exit(EXIT_SUCCESS);
