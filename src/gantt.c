@@ -42,19 +42,28 @@ void print_gantt_chart(const GanttChart* chart) {
         return;
     }
 
+    int total_time = chart->tail->end_time;
+
+    int scale = (total_time > 60) ? (total_time / 60) + 1 : 1;
+
     printf("=== Gantt Chart ===\n");
+    if (scale > 1) {
+        printf("Scale: Each character represents ~%d time units\n", scale);
+    }
 
     GanttSegment* current = chart->head;
     while (current != NULL) {
-        printf("[%s", current->pid);
-
         int duration = current->end_time - current->start_time;
-        int dashes = duration / 15; 
-        if (dashes < 3) dashes = 3;
-        if (dashes > 15) dashes = 15;
-        
-        for(int i = 0; i < dashes; i++) {
-            printf("-");
+        int chars = duration / scale;
+        if (chars < 1) chars = 1;
+
+        printf("[");
+        for(int i = 0; i < chars; i++) {
+            if (strcmp(current->pid, "IDLE") == 0) {
+                printf("-");
+            } else {
+                printf("%c", current->pid[0]);
+            }
         }
         printf("]");
         current = current->next;
@@ -62,12 +71,41 @@ void print_gantt_chart(const GanttChart* chart) {
     printf("\n");
 
     current = chart->head;
-    printf("Time: %-8d", current->start_time);
+    char buf[32];
+    sprintf(buf, "Time: %d", current->start_time);
+    printf("%s", buf);
+    
+    int time_cursor = strlen(buf);
+    int block_cursor = 0;
+
     while (current != NULL) {
-        printf(" %-8d", current->end_time);
+        int duration = current->end_time - current->start_time;
+        int chars = duration / scale;
+        if (chars < 1) chars = 1;
+        
+        block_cursor += (chars + 2);
+        
+        char time_str[32];
+        sprintf(time_str, "%d", current->end_time);
+        int time_len = strlen(time_str);
+
+        int target_pos = block_cursor - (time_len / 2);
+        
+        if (target_pos <= time_cursor) {
+            printf(" ");
+            time_cursor += 1;
+        } else {
+            while (time_cursor < target_pos) {
+                printf(" ");
+                time_cursor++;
+            }
+        }
+        printf("%s", time_str);
+        time_cursor += time_len;
+        
         current = current->next;
     }
-    printf("\n");
+    printf("\n\n");
 }
 
 void free_gantt_chart(GanttChart* chart) {
