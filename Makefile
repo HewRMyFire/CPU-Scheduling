@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Wpedantic -Iinclude -g
+CFLAGS = -Wall -Wextra -Wpedantic -Iinclude -g -MMD -MP
 
 SRC_DIR = src
 INC_DIR = include
@@ -9,6 +9,7 @@ TARGET = $(BUILD_DIR)/schedsim
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
+DEPS = $(OBJS:.o=.d)
 
 all: $(BUILD_DIR) $(TARGET)
 
@@ -24,5 +25,7 @@ $(BUILD_DIR):
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+-include $(DEPS)
 
 .PHONY: all clean
