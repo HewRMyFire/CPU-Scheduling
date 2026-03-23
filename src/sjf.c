@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include "scheduler.h"
+#include "engine.h"
 
 static void enqueue_sjf(SchedulerState *state, Process *p) {
     int i;
@@ -30,33 +31,38 @@ static void dispatch_sjf(SchedulerState *state) {
     }
 }
 
+static void sjf_arrival(SchedulerState *state, Process *p) {
+    enqueue_sjf(state, p);
+    dispatch_sjf(state);
+}
+
+static void sjf_completion(SchedulerState *state, Process *p) {
+    p->finish_time = state->current_time;
+    p->state = STATE_FINISHED;
+    p->remaining_time = 0;
+    state->current_running = NULL;
+    dispatch_sjf(state);
+}
+
 int schedule_sjf(SchedulerState *state) {
     state->current_time = 0; state->event_queue = NULL; state->current_running = NULL;
     state->ready_queue = (Process **)malloc(state->num_processes * sizeof(Process *));
     state->rq_front = 0; state->rq_rear = 0; state->rq_size = 0;
     init_gantt_chart(&state->chart);
 
-    for (int i = 0; i < state->num_processes; i++) push_event(&state->event_queue, state->processes[i].arrival_time, EVENT_ARRIVAL, &state->processes[i]);
-
-    while (state->event_queue != NULL) {
-        Event *evt = pop_event(&state->event_queue);
-        if (state->current_time < evt->time) {
-            add_gantt_segment(&state->chart, state->current_running ? state->current_running->pid : "IDLE", state->current_time, evt->time);
-            state->current_time = evt->time;
-        }
-
-        if (evt->type == EVENT_ARRIVAL) {
-            enqueue_sjf(state, evt->process);
-            dispatch_sjf(state);
-        } else if (evt->type == EVENT_COMPLETION) {
-            evt->process->finish_time = state->current_time;
-            evt->process->state = STATE_FINISHED;
-            evt->process->remaining_time = 0;
-            state->current_running = NULL;
-            dispatch_sjf(state);
-        }
-        free(evt);
+    for (int i = 0; i < state->num_processes; i++) {
+        push_event(&state->event_queue, state->processes[i].arrival_time, EVENT_ARRIVAL, &state->processes[i]);
     }
+
+    SchedulerOps ops = {
+        .handle_arrival = sjf_arrival,
+        .handle_completion = sjf_completion,
+        .handle_quantum_expire = NULL,
+        .handle_priority_boost = NULL
+    };
+    
+    simulate_scheduler(state, &ops);
+
     print_gantt_chart(&state->chart);
     free(state->ready_queue); free_gantt_chart(&state->chart);
     return 0;

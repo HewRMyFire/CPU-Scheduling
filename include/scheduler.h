@@ -17,6 +17,8 @@ typedef struct {
     int rq_front;
     int rq_rear;
     int rq_size;
+    
+    void *algo_data;
 } SchedulerState;
 
 typedef struct {
