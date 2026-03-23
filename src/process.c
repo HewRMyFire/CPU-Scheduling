@@ -16,4 +16,5 @@ void init_process(Process* p, const char* pid, int arrival, int burst) {
 
     p->queue_level = 0;
     p->quantum_used = 0;
+    p->current_allotment_used = 0;
 }

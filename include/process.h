@@ -21,6 +21,7 @@ typedef struct {
 
     int queue_level;
     int quantum_used;
+    int current_allotment_used;
 
 } Process;
 
