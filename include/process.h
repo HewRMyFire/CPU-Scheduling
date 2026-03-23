@@ -8,15 +8,19 @@ typedef enum {
 } ProcessState;
 
 typedef struct {
-    char pid[16];
-    int arrival_time;
-    int burst_time;
-    int remaining_time;
-    int start_time;
-    int finish_time;
-    int waiting_time;
-    int priority;
-    int time_in_queue;
+    char pid[16];           
+    int arrival_time;       
+    int burst_time;         
+    int remaining_time;     
+    int start_time;         
+    int finish_time;        
+    
+    int turnaround_time;    
+    int waiting_time;       
+    int response_time;      
+    
+    int priority;           
+    int time_in_queue;      
     
     ProcessState state;     
     int quantum_used;       

@@ -20,21 +20,20 @@ void calculate_metrics(SchedulingMetrics* metrics, Process* processes, int num_p
     for (int i = 0; i < num_processes; i++) {
         Process* p = &processes[i];
 
-        int turnaround_time = p->completion_time - p->arrival_time;
-        int waiting_time = turnaround_time - p->burst_time;
-        int response_time = p->start_time - p->arrival_time;
+        p->turnaround_time = p->finish_time - p->arrival_time;
 
-        metrics->total_turnaround_time += turnaround_time;
-        metrics->total_waiting_time += waiting_time;
-        metrics->total_response_time += response_time;
+        p->waiting_time = p->turnaround_time - p->burst_time;
+        if (p->waiting_time < 0) p->waiting_time = 0;
+
+        p->response_time = p->start_time - p->arrival_time;
+
+        metrics->total_turnaround_time += p->turnaround_time;
+        metrics->total_waiting_time += p->waiting_time;
+        metrics->total_response_time += p->response_time;
         metrics->total_execution_time += p->burst_time;
 
-        if (p->completion_time > max_completion_time) {
-            max_completion_time = p->completion_time;
-        }
-        if (p->arrival_time < min_arrival_time) {
-            min_arrival_time = p->arrival_time;
-        }
+        if (p->finish_time > max_completion_time) max_completion_time = p->finish_time;
+        if (p->arrival_time < min_arrival_time) min_arrival_time = p->arrival_time;
     }
 
     metrics->avg_turnaround_time = (double)metrics->total_turnaround_time / num_processes;
@@ -61,24 +60,19 @@ void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
     for (int i = 0; i < metrics->num_processes; i++) {
         Process* p = &processes[i];
 
-        int tt = p->completion_time - p->arrival_time;
-        int wt = tt - p->burst_time;
-        int rt = p->start_time - p->arrival_time;
-
-        if (wt < 0) wt = 0; 
-
         printf("Process %s:\n", p->pid);
         printf("  Arrival Time:           %d\n", p->arrival_time);
         printf("  Burst Time:             %d\n", p->burst_time);
-        printf("  Finish Time:            %d\n", p->completion_time);
-        printf("  Turnaround Time:  %d - %d = %d\n", p->completion_time, p->arrival_time, tt);
-        printf("  Waiting Time:         %d - %d = %d\n", tt, p->burst_time, wt);
-        printf("  Response Time:     %d - %d = %d\n\n", p->start_time, p->arrival_time, rt);
+        printf("  Finish Time:            %d\n", p->finish_time);
 
-        if (wt > p->burst_time && wt > convoy_wait_time && p->burst_time > 0) {
+        printf("  Turnaround Time:  %d - %d = %d\n", p->finish_time, p->arrival_time, p->turnaround_time);
+        printf("  Waiting Time:         %d - %d = %d\n", p->turnaround_time, p->burst_time, p->waiting_time);
+        printf("  Response Time:     %d - %d = %d\n\n", p->start_time, p->arrival_time, p->response_time);
+
+        if (p->waiting_time > p->burst_time && p->waiting_time > convoy_wait_time && p->burst_time > 0) {
             convoy_detected = 1;
             strcpy(convoy_pid, p->pid);
-            convoy_wait_time = wt;
+            convoy_wait_time = p->waiting_time;
         }
     }
 
