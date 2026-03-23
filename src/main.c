@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include "process.h"
 #include "scheduler.h"
@@ -12,8 +13,39 @@
 
 #define MAX_PROCESSES 100
 
+#ifdef _WIN32
+#define DEV_NULL "NUL"
+#else
+#define DEV_NULL "/dev/null"
+#endif
+
 int run_fcfs = 0, run_sjf = 0, run_stcf = 0, run_rr = 0, run_mlfq = 0, run_all = 0;
 int time_quantum = 30; 
+int compare_mode = 0;
+int saved_stdout;
+
+void suppress_output() {
+    fflush(stdout);
+    saved_stdout = dup(STDOUT_FILENO);
+    int fd = open(DEV_NULL, O_WRONLY);
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+}
+
+void restore_output() {
+    fflush(stdout);
+    dup2(saved_stdout, STDOUT_FILENO);
+    close(saved_stdout);
+}
+
+const char* get_basename(const char* path) {
+    const char* base = strrchr(path, '/');
+#ifdef _WIN32
+    const char* base_win = strrchr(path, '\\');
+    if (base_win > base) base = base_win;
+#endif
+    return base ? base + 1 : path;
+}
 
 void print_usage(const char* prog_name) {
     printf("Usage: %s [options]\n", prog_name);
@@ -22,17 +54,22 @@ void print_usage(const char* prog_name) {
     printf("  --processes=<str>    Inline processes format 'PID:Arrival:Burst,...'\n");
     printf("  --input=<file>       Specify input file containing process workloads\n");
     printf("  --mlfq-config=<file> Specify MLFQ configuration file\n");
+    printf("  --compare            Run all algorithms silently and display a comparison table\n");
     printf("  --quantum=<int>      Time quantum for Round Robin (Default: 30)\n");
     printf("  -f <file>            Specify input file containing process workloads\n");
     printf("  -q <int>             Time quantum for Round Robin\n");
+    printf("  -c                   Alias for --compare\n");
 }
 
 int main(int argc, char* argv[]) {
     Process original_processes[MAX_PROCESSES];
     Process current_processes[MAX_PROCESSES];
     int num_processes = 0;
-    char mlfq_config_file[256] = "";
     
+    char input_filename[256] = "inline_workload";
+    char mlfq_config_file[256] = "";
+    static char rr_name[32];
+
     int opt;
     int option_index = 0;
     static struct option long_options[] = {
@@ -41,10 +78,11 @@ int main(int argc, char* argv[]) {
         {"input", required_argument, 0, 'i'}, 
         {"quantum", required_argument, 0, 'q'}, 
         {"mlfq-config", required_argument, 0, 'm'}, 
+        {"compare", no_argument, 0, 'c'}, 
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv, "f:q:hm:i:", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:q:hm:i:c", long_options, &option_index)) != -1) {
         switch (opt) {
             case 'a':
                 if (strcmp(optarg, "FCFS") == 0) run_fcfs = 1;
@@ -57,8 +95,13 @@ int main(int argc, char* argv[]) {
             case 'p': 
                 num_processes = load_processes_from_string(optarg, original_processes, MAX_PROCESSES); 
                 break;
+            case 'c': 
+                compare_mode = 1; 
+                run_all = 1; 
+                break;
             case 'i': 
             case 'f': 
+                strncpy(input_filename, get_basename(optarg), 255);
                 num_processes = load_processes_from_file(optarg, original_processes, MAX_PROCESSES); 
                 break;
             case 'q': time_quantum = atoi(optarg); break;
@@ -79,76 +122,84 @@ int main(int argc, char* argv[]) {
     int metrics_count = 0;
 
     if (run_fcfs || run_all) {
-        printf("\nRunning First-Come, First-Served (FCFS) Scheduler...\n");
+        if (!compare_mode) printf("\nRunning First-Come, First-Served (FCFS) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
+        
+        if (compare_mode) suppress_output();
         simulate_fcfs(current_processes, num_processes);
+        if (compare_mode) restore_output();
+        
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "FCFS");
-        print_metrics(&metrics_array[metrics_count], current_processes);
+        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
         metrics_count++;
     }
 
     if (run_sjf || run_all) {
-        printf("\nRunning Shortest Job First (SJF) Scheduler...\n");
+        if (!compare_mode) printf("\nRunning Shortest Job First (SJF) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
+        
+        if (compare_mode) suppress_output();
         simulate_sjf(current_processes, num_processes);
+        if (compare_mode) restore_output();
+        
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "SJF");
-        print_metrics(&metrics_array[metrics_count], current_processes); 
+        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
         metrics_count++;
     }
 
     if (run_stcf || run_all) {
-        printf("\nRunning Shortest Time-to-Completion First (STCF) Scheduler...\n");
+        if (!compare_mode) printf("\nRunning Shortest Time-to-Completion First (STCF) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
+        
+        if (compare_mode) suppress_output();
         simulate_stcf(current_processes, num_processes);
+        if (compare_mode) restore_output();
+        
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "STCF");
-        print_metrics(&metrics_array[metrics_count], current_processes); 
+        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
         metrics_count++;
     }
 
     if (run_rr || run_all) {
-        printf("\nRunning Round Robin (RR) Scheduler...\n");
+        if (!compare_mode) printf("\nRunning Round Robin (RR) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
+        
+        sprintf(rr_name, "RR (q=%d)", time_quantum);
+        
+        if (compare_mode) suppress_output();
         simulate_rr(current_processes, num_processes, time_quantum);
-        calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "RR");
-        print_metrics(&metrics_array[metrics_count], current_processes); 
+        if (compare_mode) restore_output();
+        
+        calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, rr_name);
+        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
         metrics_count++;
     }
 
     if (run_mlfq || run_all) {
-        printf("\nRunning Multi-Level Feedback Queue (MLFQ) Scheduler...\n");
+        if (!compare_mode) printf("\nRunning Multi-Level Feedback Queue (MLFQ) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
         
-        MLFQ_Config mlfq_config;
-        int def_q[3] = {10, 30, -1};
-        int def_a[3] = {50, 150, -1};
-        mlfq_config.num_queues = 3;
-        mlfq_config.time_quantums = def_q;
-        mlfq_config.allotments = def_a;
-        mlfq_config.boost_interval = 200;
-        int allocated_config = 0;
-
-        if (strlen(mlfq_config_file) > 0) {
-            if (load_mlfq_config(mlfq_config_file, &mlfq_config)) {
-                allocated_config = 1;
-            } else {
-                fprintf(stderr, "Warning: Failed to load MLFQ config, using defaults.\n");
-            }
-        }
+        MLFQ_Config mlfq_config = { .num_queues = 3, .time_quantums = (int[]){10, 30, -1}, .allotments = (int[]){50, 150, -1}, .boost_interval = 200 };
+        int allocated = (strlen(mlfq_config_file) > 0 && load_mlfq_config(mlfq_config_file, &mlfq_config));
         
+        if (compare_mode) suppress_output();
         simulate_mlfq(current_processes, num_processes, &mlfq_config);
+        if (compare_mode) restore_output();
         
         calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "MLFQ");
-        print_metrics(&metrics_array[metrics_count], current_processes);
+        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
         metrics_count++;
 
-        if (allocated_config) {
-            free(mlfq_config.time_quantums);
-            free(mlfq_config.allotments);
-        }
+        if (allocated) { free(mlfq_config.time_quantums); free(mlfq_config.allotments); }
     }
 
     if (metrics_count > 1) {
-        print_comparative_analysis(metrics_array, metrics_count);
+        print_comparative_analysis(metrics_array, metrics_count, input_filename);
     }
 
     return EXIT_SUCCESS;

@@ -92,21 +92,26 @@ void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
     }
 }
 
-void print_comparative_analysis(const SchedulingMetrics* metrics_array, int num_algorithms) {
-    printf("\n=== Comparative Analysis ===\n");
-    printf("%-10s | %-12s | %-12s | %-12s | %-12s | %-10s\n",
-           "Algorithm", "Avg Turn", "Avg Wait", "Avg Resp", "CPU Util(%)", "Throughput");
-    printf("--------------------------------------------------------------------------------------\n");
+void print_comparative_analysis(const SchedulingMetrics* metrics_array, int num_algorithms, const char* input_file) {
+    if (input_file && strlen(input_file) > 0) {
+        printf("\n=== Algorithm Comparison for %s ===\n\n", input_file);
+    } else {
+        printf("\n=== Algorithm Comparison ===\n\n");
+    }
+    
+    printf("%-10s | %-6s | %-6s | %-6s | %-16s\n",
+           "Algorithm", "Avg TT", "Avg WT", "Avg RT", "Context Switches");
+    printf("-----------|--------|--------|--------|------------------\n");
 
     for (int i = 0; i < num_algorithms; i++) {
         const SchedulingMetrics* m = &metrics_array[i];
-        printf("%-10s | %-12.2f | %-12.2f | %-12.2f | %-12.2f | %-10.4f\n",
+        
+        printf("%-10s | %6.1f | %6.1f | %6.1f | %16d\n",
                m->algorithm_name,
                m->avg_turnaround_time,
                m->avg_waiting_time,
                m->avg_response_time,
-               m->cpu_utilization,
-               m->throughput);
+               m->context_switches);
     }
-    printf("============================\n");
+    printf("\n");
 }

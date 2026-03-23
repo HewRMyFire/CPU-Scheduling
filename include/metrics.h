@@ -18,12 +18,12 @@ typedef struct {
     double cpu_utilization;
     double throughput;
 
+    int context_switches;
 } SchedulingMetrics;
 
 void calculate_metrics(SchedulingMetrics* metrics, Process* processes, int num_processes, const char* algo_name);
-
 void print_metrics(const SchedulingMetrics* metrics, Process* processes);
 
-void print_comparative_analysis(const SchedulingMetrics* metrics_array, int num_algorithms);
+void print_comparative_analysis(const SchedulingMetrics* metrics_array, int num_algorithms, const char* input_file);
 
 #endif

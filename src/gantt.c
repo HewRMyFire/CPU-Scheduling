@@ -4,11 +4,14 @@
 #include "gantt.h"
 #include "utils.h"
 
+static int total_dispatches = 0;
+
 void init_gantt_chart(GanttChart* chart) {
     if (chart != NULL) {
         chart->head = NULL;
         chart->tail = NULL;
     }
+    total_dispatches = 0;
 }
 
 void add_gantt_segment(GanttChart* chart, const char* pid, int start_time, int end_time) {
@@ -19,8 +22,11 @@ void add_gantt_segment(GanttChart* chart, const char* pid, int start_time, int e
         return;
     }
 
-    GanttSegment* new_seg = (GanttSegment*)safe_malloc(sizeof(GanttSegment));
+    if (strcmp(pid, "IDLE") != 0) {
+        total_dispatches++;
+    }
 
+    GanttSegment* new_seg = (GanttSegment*)safe_malloc(sizeof(GanttSegment));
     strncpy(new_seg->pid, pid, sizeof(new_seg->pid) - 1);
     new_seg->pid[sizeof(new_seg->pid) - 1] = '\0';
     new_seg->start_time = start_time;
@@ -120,4 +126,9 @@ void free_gantt_chart(GanttChart* chart) {
 
     chart->head = NULL;
     chart->tail = NULL;
+}
+
+int get_last_context_switches(int num_processes) {
+    int switches = total_dispatches - num_processes;
+    return (switches < 0) ? 0 : switches;
 }
