@@ -52,9 +52,7 @@ void calculate_metrics(SchedulingMetrics* metrics, Process* processes, int num_p
 }
 
 void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
-    printf("=== Metrics ===\n");
-    printf("Process | AT  | BT  | FT  | TT  | WT  | RT  \n");
-    printf("--------|-----|-----|-----|-----|-----|-----\n");
+    printf("=== Metrics for %s ===\n", metrics->algorithm_name);
 
     int convoy_detected = 0;
     char convoy_pid[16] = "";
@@ -62,15 +60,20 @@ void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
 
     for (int i = 0; i < metrics->num_processes; i++) {
         Process* p = &processes[i];
+
         int tt = p->completion_time - p->arrival_time;
         int wt = tt - p->burst_time;
         int rt = p->start_time - p->arrival_time;
 
         if (wt < 0) wt = 0; 
 
-        printf("%-7s | %-3d | %-3d | %-3d | %-3d | %-3d | %-3d\n",
-               p->pid, p->arrival_time, p->burst_time, 
-               p->completion_time, tt, wt, rt);
+        printf("Process %s:\n", p->pid);
+        printf("  Arrival Time:           %d\n", p->arrival_time);
+        printf("  Burst Time:             %d\n", p->burst_time);
+        printf("  Finish Time:            %d\n", p->completion_time);
+        printf("  Turnaround Time:  %d - %d = %d\n", p->completion_time, p->arrival_time, tt);
+        printf("  Waiting Time:         %d - %d = %d\n", tt, p->burst_time, wt);
+        printf("  Response Time:     %d - %d = %d\n\n", p->start_time, p->arrival_time, rt);
 
         if (wt > p->burst_time && wt > convoy_wait_time && p->burst_time > 0) {
             convoy_detected = 1;
@@ -79,9 +82,10 @@ void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
         }
     }
 
-    printf("--------|-----|-----|-----|-----|-----|-----\n");
-    printf("Average |     |     |     | %-3.0f | %-3.0f | %-3.0f\n\n", 
-           metrics->avg_turnaround_time, metrics->avg_waiting_time, metrics->avg_response_time);
+    printf("--- Average Metrics ---\n");
+    printf("Average Turnaround Time: %.2f\n", metrics->avg_turnaround_time);
+    printf("Average Waiting Time:    %.2f\n", metrics->avg_waiting_time);
+    printf("Average Response Time:   %.2f\n\n", metrics->avg_response_time);
 
     if (convoy_detected && strcmp(metrics->algorithm_name, "FCFS") == 0) {
         printf("Convoy effect detected: Process %s waited %d time units\n\n", convoy_pid, convoy_wait_time);
