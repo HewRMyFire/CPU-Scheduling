@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
     
     char input_filename[256] = "inline_workload";
     char mlfq_config_file[256] = "";
-    static char rr_name[32];
+    static char rr_name[32]; 
 
     int opt;
     int option_index = 0;
@@ -95,10 +95,7 @@ int main(int argc, char* argv[]) {
             case 'p': 
                 num_processes = load_processes_from_string(optarg, original_processes, MAX_PROCESSES); 
                 break;
-            case 'c': 
-                compare_mode = 1; 
-                run_all = 1; 
-                break;
+            case 'c': compare_mode = 1; run_all = 1; break;
             case 'i': 
             case 'f': 
                 strncpy(input_filename, get_basename(optarg), 255);
@@ -125,42 +122,48 @@ int main(int argc, char* argv[]) {
         if (!compare_mode) printf("\nRunning First-Come, First-Served (FCFS) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
         
-        if (compare_mode) suppress_output();
-        simulate_fcfs(current_processes, num_processes);
-        if (compare_mode) restore_output();
+        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
         
-        calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "FCFS");
-        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
-        metrics_count++;
+        if (compare_mode) suppress_output();
+        if (schedule_fcfs(&state) == 0) {
+            if (compare_mode) restore_output();
+            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "FCFS");
+            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
+            metrics_count++;
+        } else if (compare_mode) restore_output();
     }
 
     if (run_sjf || run_all) {
         if (!compare_mode) printf("\nRunning Shortest Job First (SJF) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
         
-        if (compare_mode) suppress_output();
-        simulate_sjf(current_processes, num_processes);
-        if (compare_mode) restore_output();
+        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
         
-        calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "SJF");
-        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
-        metrics_count++;
+        if (compare_mode) suppress_output();
+        if (schedule_sjf(&state) == 0) {
+            if (compare_mode) restore_output();
+            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "SJF");
+            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
+            metrics_count++;
+        } else if (compare_mode) restore_output();
     }
 
     if (run_stcf || run_all) {
         if (!compare_mode) printf("\nRunning Shortest Time-to-Completion First (STCF) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
         
-        if (compare_mode) suppress_output();
-        simulate_stcf(current_processes, num_processes);
-        if (compare_mode) restore_output();
+        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
         
-        calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "STCF");
-        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
-        metrics_count++;
+        if (compare_mode) suppress_output();
+        if (schedule_stcf(&state) == 0) {
+            if (compare_mode) restore_output();
+            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "STCF");
+            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
+            metrics_count++;
+        } else if (compare_mode) restore_output();
     }
 
     if (run_rr || run_all) {
@@ -168,39 +171,52 @@ int main(int argc, char* argv[]) {
         copy_process_array(current_processes, original_processes, num_processes);
         
         sprintf(rr_name, "RR (q=%d)", time_quantum);
+        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
         
         if (compare_mode) suppress_output();
-        simulate_rr(current_processes, num_processes, time_quantum);
-        if (compare_mode) restore_output();
-        
-        calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, rr_name);
-        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
-        metrics_count++;
+        if (schedule_rr(&state, time_quantum) == 0) {
+            if (compare_mode) restore_output();
+            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, rr_name);
+            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
+            metrics_count++;
+        } else if (compare_mode) restore_output();
     }
 
     if (run_mlfq || run_all) {
         if (!compare_mode) printf("\nRunning Multi-Level Feedback Queue (MLFQ) Scheduler...\n");
         copy_process_array(current_processes, original_processes, num_processes);
         
-        MLFQ_Config mlfq_config = { .num_queues = 3, .time_quantums = (int[]){10, 30, -1}, .allotments = (int[]){50, 150, -1}, .boost_interval = 200 };
-        int allocated = (strlen(mlfq_config_file) > 0 && load_mlfq_config(mlfq_config_file, &mlfq_config));
+        MLFQ_Config parsed_config = { .num_queues = 3, .time_quantums = (int[]){10, 30, -1}, .allotments = (int[]){50, 150, -1}, .boost_interval = 200 };
+        int allocated = (strlen(mlfq_config_file) > 0 && load_mlfq_config(mlfq_config_file, &parsed_config));
+        
+        MLFQScheduler mlfq_sched;
+        mlfq_sched.num_queues = parsed_config.num_queues;
+        mlfq_sched.boost_period = parsed_config.boost_interval;
+        mlfq_sched.queues = (MLFQQueue*)malloc(mlfq_sched.num_queues * sizeof(MLFQQueue));
+        
+        for(int i = 0; i < mlfq_sched.num_queues; i++) {
+            mlfq_sched.queues[i].level = i;
+            mlfq_sched.queues[i].time_quantum = parsed_config.time_quantums[i];
+            mlfq_sched.queues[i].allotment = parsed_config.allotments[i];
+        }
+
+        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
         
         if (compare_mode) suppress_output();
-        simulate_mlfq(current_processes, num_processes, &mlfq_config);
-        if (compare_mode) restore_output();
-        
-        calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "MLFQ");
-        metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-        if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
-        metrics_count++;
+        if (schedule_mlfq(&state, &mlfq_sched) == 0) {
+            if (compare_mode) restore_output();
+            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "MLFQ");
+            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
+            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
+            metrics_count++;
+        } else if (compare_mode) restore_output();
 
-        if (allocated) { free(mlfq_config.time_quantums); free(mlfq_config.allotments); }
+        free(mlfq_sched.queues);
+        if (allocated) { free(parsed_config.time_quantums); free(parsed_config.allotments); }
     }
 
-    if (metrics_count > 1) {
-        print_comparative_analysis(metrics_array, metrics_count, input_filename);
-    }
+    if (metrics_count > 1) print_comparative_analysis(metrics_array, metrics_count, input_filename);
 
     return EXIT_SUCCESS;
 }

@@ -1,41 +1,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "scheduler.h"
-#include "process.h"
-#include "gantt.h"
 #include "utils.h"
 
-void simulate_fcfs(Process* processes, int num_processes) {
-    if (num_processes <= 0) return;
+int schedule_fcfs(SchedulerState *state) {
+    if (!state || !state->processes || state->num_processes <= 0) return -1;
 
-    qsort(processes, num_processes, sizeof(Process), compare_arrival_time);
+    qsort(state->processes, state->num_processes, sizeof(Process), compare_arrival_time);
+    init_gantt_chart(&state->chart);
+    state->current_time = 0;
 
-    int current_time = 0;
-    GanttChart chart;
-    init_gantt_chart(&chart);
+    for (int i = 0; i < state->num_processes; i++) {
+        Process *p = &state->processes[i];
 
-    for (int i = 0; i < num_processes; i++) {
-        Process* p = &processes[i];
-
-        if (current_time < p->arrival_time) {
-            add_gantt_segment(&chart, "IDLE", current_time, p->arrival_time);
-            current_time = p->arrival_time;
+        if (state->current_time < p->arrival_time) {
+            add_gantt_segment(&state->chart, "IDLE", state->current_time, p->arrival_time);
+            state->current_time = p->arrival_time;
         }
 
-        p->start_time = current_time;
+        p->start_time = state->current_time;
         p->state = STATE_RUNNING;
 
-        int start = current_time;
-        current_time += p->burst_time;
+        add_gantt_segment(&state->chart, p->pid, state->current_time, state->current_time + p->burst_time);
 
+        state->current_time += p->burst_time;
         p->remaining_time = 0;
-        p->completion_time = current_time;
+        p->finish_time = state->current_time;
         p->state = STATE_FINISHED;
-
-        add_gantt_segment(&chart, p->pid, start, current_time);
     }
 
-    printf("\nFCFS Gantt Chart:\n");
-    print_gantt_chart(&chart);
-    free_gantt_chart(&chart);
+    print_gantt_chart(&state->chart);
+    free_gantt_chart(&state->chart);
+    return 0;
 }

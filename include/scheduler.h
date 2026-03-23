@@ -1,6 +1,14 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 #include "process.h"
+#include "gantt.h"
+
+typedef struct {
+    Process *processes;
+    int num_processes;
+    int current_time;
+    GanttChart chart;
+} SchedulerState;
 
 typedef struct {
     int level;
@@ -21,14 +29,17 @@ typedef struct {
     int last_boost;
 } MLFQScheduler;
 
-void simulate_fcfs(Process* processes, int num_processes);
-void simulate_sjf(Process* processes, int num_processes);
-void simulate_stcf(Process* processes, int num_processes);
-void simulate_rr(Process* processes, int num_processes, int time_quantum);
+typedef struct {
+    int num_queues;
+    int* time_quantums;
+    int* allotments;
+    int boost_interval;
+} MLFQ_Config;
 
-void simulate_mlfq(Process* processes, int num_processes, MLFQScheduler* scheduler);
-
-void calculate_and_print_metrics(Process* processes, int num_processes);
-void print_gantt_chart();
+int schedule_fcfs(SchedulerState *state);
+int schedule_sjf(SchedulerState *state);
+int schedule_stcf(SchedulerState *state);
+int schedule_rr(SchedulerState *state, int time_quantum);
+int schedule_mlfq(SchedulerState *state, MLFQScheduler* scheduler);
 
 #endif
