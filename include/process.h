@@ -9,20 +9,17 @@ typedef enum {
 
 typedef struct {
     char pid[16];
-
     int arrival_time;
     int burst_time;
-
     int remaining_time;
     int start_time;
-    int completion_time;
-
-    ProcessState state;
-
-    int queue_level;
-    int quantum_used;
-    int current_allotment_used;
-
+    int finish_time;
+    int waiting_time;
+    int priority;
+    int time_in_queue;
+    
+    ProcessState state;     
+    int quantum_used;       
 } Process;
 
 void init_process(Process* p, const char* pid, int arrival, int burst);

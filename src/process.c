@@ -10,11 +10,12 @@ void init_process(Process* p, const char* pid, int arrival, int burst) {
 
     p->remaining_time = burst;
     p->start_time = -1;
-    p->completion_time = -1;
+    p->finish_time = -1;
+    p->waiting_time = 0;
 
     p->state = STATE_READY;
 
-    p->queue_level = 0;
+    p->priority = 0;
+    p->time_in_queue = 0;
     p->quantum_used = 0;
-    p->current_allotment_used = 0;
 }
