@@ -4,6 +4,7 @@ CFLAGS = -Wall -Wextra -Wpedantic -Iinclude -g -MMD -MP
 SRC_DIR = src
 INC_DIR = include
 BUILD_DIR = build
+TEST_DIR = tests
 
 TARGET = $(BUILD_DIR)/schedsim 
 
@@ -26,6 +27,10 @@ $(BUILD_DIR):
 clean:
 	rm -rf $(BUILD_DIR)
 
+test: all
+	@echo "Running automated test suite..."
+	@cd $(TEST_DIR) && bash test_all_algorithms.sh
+
 -include $(DEPS)
 
-.PHONY: all clean
+.PHONY: all clean test
