@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "scheduler.h"
 #include "engine.h"
+#include "utils.h"
 
 static void enqueue_mlfq(MLFQScheduler *config, int q_level, Process *p) {
     MLFQQueue *q = &config->queues[q_level];
@@ -26,9 +27,8 @@ static void dispatch_mlfq(SchedulerState *state) {
     for (int i = 0; i < config->num_queues; i++) {
         if (config->queues[i].size > 0) {
             Process *p = dequeue_mlfq(config, i);
-            state->current_running = p;
-            if (p->start_time == -1) p->start_time = state->current_time;
-            p->state = STATE_RUNNING;
+            set_process_running(p, state);
+            init_process_start_time(p, state);
             p->quantum_used = state->current_time;
 
             int q = config->queues[i].time_quantum;
@@ -92,10 +92,7 @@ static void mlfq_quantum_expire(SchedulerState *state, Process *p) {
 }
 
 static void mlfq_completion(SchedulerState *state, Process *p) {
-    p->finish_time = state->current_time;
-    p->state = STATE_FINISHED;
-    p->remaining_time = 0;
-    state->current_running = NULL;
+    process_completion_handler(state, p);
     dispatch_mlfq(state);
 }
 

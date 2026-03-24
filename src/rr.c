@@ -1,18 +1,17 @@
 #include <stdlib.h>
 #include "scheduler.h"
 #include "engine.h"
+#include "utils.h"
 
 static void dispatch_rr(SchedulerState *state) {
     int time_quantum = *(int*)state->algo_data;
 
     if (state->current_running == NULL && state->rq_size > 0) {
-        Process *p = state->ready_queue[state->rq_front];
-        state->rq_front = (state->rq_front + 1) % state->num_processes;
-        state->rq_size--;
+        Process *p;
+        dequeue_ready_queue(state, &p);
 
-        state->current_running = p;
-        if (p->start_time == -1) p->start_time = state->current_time;
-        p->state = STATE_RUNNING;
+        set_process_running(p, state);
+        init_process_start_time(p, state);
         p->quantum_used = state->current_time;
         
         if (p->remaining_time > time_quantum) {
@@ -24,9 +23,7 @@ static void dispatch_rr(SchedulerState *state) {
 }
 
 static void rr_arrival(SchedulerState *state, Process *p) {
-    state->ready_queue[state->rq_rear] = p;
-    state->rq_rear = (state->rq_rear + 1) % state->num_processes;
-    state->rq_size++;
+    enqueue_ready_queue_fifo(state, p);
     dispatch_rr(state);
 }
 
@@ -35,30 +32,27 @@ static void rr_quantum_expire(SchedulerState *state, Process *p) {
     p->remaining_time -= elapsed;
     state->current_running = NULL;
     
-    state->ready_queue[state->rq_rear] = p;
-    state->rq_rear = (state->rq_rear + 1) % state->num_processes;
-    state->rq_size++;
+    enqueue_ready_queue_fifo(state, p);
     dispatch_rr(state);
 }
 
 static void rr_completion(SchedulerState *state, Process *p) {
-    p->finish_time = state->current_time;
-    p->state = STATE_FINISHED;
-    p->remaining_time = 0;
-    state->current_running = NULL;
+    process_completion_handler(state, p);
     dispatch_rr(state);
 }
 
 int schedule_rr(SchedulerState *state, int time_quantum) {
-    state->current_time = 0; state->event_queue = NULL; state->current_running = NULL;
+    state->current_time = 0;
+    state->event_queue = NULL;
+    state->current_running = NULL;
     state->ready_queue = (Process **)malloc(state->num_processes * sizeof(Process *));
-    state->rq_front = 0; state->rq_rear = 0; state->rq_size = 0;
+    state->rq_front = 0;
+    state->rq_rear = 0;
+    state->rq_size = 0;
     state->algo_data = &time_quantum;
     init_gantt_chart(&state->chart);
 
-    for (int i = 0; i < state->num_processes; i++) {
-        push_event(&state->event_queue, state->processes[i].arrival_time, EVENT_ARRIVAL, &state->processes[i]);
-    }
+    init_arrival_events(state);
 
     SchedulerOps ops = {
         .handle_arrival = rr_arrival,
@@ -69,7 +63,6 @@ int schedule_rr(SchedulerState *state, int time_quantum) {
     
     simulate_scheduler(state, &ops);
 
-    print_gantt_chart(&state->chart);
-    free(state->ready_queue); free_gantt_chart(&state->chart);
+    finalize_scheduler(state);
     return 0;
 }

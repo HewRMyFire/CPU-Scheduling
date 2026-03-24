@@ -6,6 +6,7 @@
 #include <getopt.h>
 #include "process.h"
 #include "scheduler.h"
+#include "scheduler_registry.h"
 #include "metrics.h"
 #include "gantt.h"
 #include "utils.h"
@@ -38,13 +39,56 @@ void restore_output() {
     close(saved_stdout);
 }
 
-const char* get_basename(const char* path) {
-    const char* base = strrchr(path, '/');
-#ifdef _WIN32
-    const char* base_win = strrchr(path, '\\');
-    if (base_win > base) base = base_win;
-#endif
-    return base ? base + 1 : path;
+static int run_scheduler(const char* scheduler_name, Process* current_processes, 
+                        Process* original_processes, int num_processes,
+                        int time_quantum, void* scheduler_config,
+                        SchedulingMetrics* metrics, int compare_mode) {
+    int result = 0;
+    const SchedulerEntry* entry = NULL;
+    const SchedulerEntry* available = get_available_schedulers(NULL);
+    
+    for (int i = 0; available[i].name != NULL; i++) {
+        if (strcmp(available[i].name, scheduler_name) == 0) {
+            entry = &available[i];
+            break;
+        }
+    }
+    
+    if (entry == NULL) {
+        fprintf(stderr, "Error: Unknown scheduler '%s'\n", scheduler_name);
+        return -1;
+    }
+    
+    if (!compare_mode) printf("\nRunning %s...\n", entry->full_name);
+    copy_process_array(current_processes, original_processes, num_processes);
+    
+    SchedulerState state = {
+        .processes = current_processes,
+        .num_processes = num_processes,
+        .current_time = 0
+    };
+    
+    char algo_name_buffer[64];
+    if (strcmp(scheduler_name, "RR") == 0) {
+        snprintf(algo_name_buffer, sizeof(algo_name_buffer), "RR (q=%d)", time_quantum);
+    } else {
+        strncpy(algo_name_buffer, scheduler_name, sizeof(algo_name_buffer) - 1);
+    }
+    
+    if (compare_mode) suppress_output();
+    result = entry->run(&state, time_quantum, scheduler_config);
+    
+    if (result == 0) {
+        if (compare_mode) restore_output();
+        calculate_metrics(metrics, current_processes, num_processes, algo_name_buffer);
+        metrics->context_switches = get_last_context_switches(num_processes);
+        if (!compare_mode) print_metrics(metrics, current_processes);
+        return 0;
+    } else if (compare_mode) {
+        restore_output();
+    }
+    
+    return -1;
 }
 
 void print_usage(const char* prog_name) {
@@ -68,10 +112,8 @@ int main(int argc, char* argv[]) {
     
     char input_filename[256] = "inline_workload";
     char mlfq_config_file[256] = "";
-    static char rr_name[32]; 
 
     int opt;
-    int option_index = 0;
     static struct option long_options[] = {
         {"algorithm", required_argument, 0, 'a'},
         {"processes", required_argument, 0, 'p'},
@@ -82,7 +124,7 @@ int main(int argc, char* argv[]) {
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv, "f:q:hm:i:c", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:q:hm:i:c", long_options, NULL)) != -1) {
         switch (opt) {
             case 'a':
                 if (strcmp(optarg, "FCFS") == 0) run_fcfs = 1;
@@ -97,10 +139,16 @@ int main(int argc, char* argv[]) {
                 break;
             case 'c': compare_mode = 1; run_all = 1; break;
             case 'i': 
-            case 'f': 
-                strncpy(input_filename, get_basename(optarg), 255);
+            case 'f': {
+                const char* base = strrchr(optarg, '/');
+#ifdef _WIN32
+                const char* base_win = strrchr(optarg, '\\');
+                if (base_win > base) base = base_win;
+#endif
+                strncpy(input_filename, base ? base + 1 : optarg, 255);
                 num_processes = load_processes_from_file(optarg, original_processes, MAX_PROCESSES); 
                 break;
+            }
             case 'q': time_quantum = atoi(optarg); break;
             case 'm': strncpy(mlfq_config_file, optarg, 255); break;
             case 'h': print_usage(argv[0]); exit(EXIT_SUCCESS);
@@ -117,103 +165,73 @@ int main(int argc, char* argv[]) {
 
     SchedulingMetrics metrics_array[5];
     int metrics_count = 0;
-
-    if (run_fcfs || run_all) {
-        if (!compare_mode) printf("\nRunning First-Come, First-Served (FCFS) Scheduler...\n");
-        copy_process_array(current_processes, original_processes, num_processes);
-        
-        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
-        
-        if (compare_mode) suppress_output();
-        if (schedule_fcfs(&state) == 0) {
-            if (compare_mode) restore_output();
-            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "FCFS");
-            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
-            metrics_count++;
-        } else if (compare_mode) restore_output();
-    }
-
-    if (run_sjf || run_all) {
-        if (!compare_mode) printf("\nRunning Shortest Job First (SJF) Scheduler...\n");
-        copy_process_array(current_processes, original_processes, num_processes);
-        
-        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
-        
-        if (compare_mode) suppress_output();
-        if (schedule_sjf(&state) == 0) {
-            if (compare_mode) restore_output();
-            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "SJF");
-            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
-            metrics_count++;
-        } else if (compare_mode) restore_output();
-    }
-
-    if (run_stcf || run_all) {
-        if (!compare_mode) printf("\nRunning Shortest Time-to-Completion First (STCF) Scheduler...\n");
-        copy_process_array(current_processes, original_processes, num_processes);
-        
-        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
-        
-        if (compare_mode) suppress_output();
-        if (schedule_stcf(&state) == 0) {
-            if (compare_mode) restore_output();
-            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "STCF");
-            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
-            metrics_count++;
-        } else if (compare_mode) restore_output();
-    }
-
-    if (run_rr || run_all) {
-        if (!compare_mode) printf("\nRunning Round Robin (RR) Scheduler...\n");
-        copy_process_array(current_processes, original_processes, num_processes);
-        
-        sprintf(rr_name, "RR (q=%d)", time_quantum);
-        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
-        
-        if (compare_mode) suppress_output();
-        if (schedule_rr(&state, time_quantum) == 0) {
-            if (compare_mode) restore_output();
-            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, rr_name);
-            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes); 
-            metrics_count++;
-        } else if (compare_mode) restore_output();
-    }
-
-    if (run_mlfq || run_all) {
-        if (!compare_mode) printf("\nRunning Multi-Level Feedback Queue (MLFQ) Scheduler...\n");
-        copy_process_array(current_processes, original_processes, num_processes);
-        
-        MLFQ_Config parsed_config = { .num_queues = 3, .time_quantums = (int[]){10, 30, -1}, .allotments = (int[]){50, 150, -1}, .boost_interval = 200 };
-        int allocated = (strlen(mlfq_config_file) > 0 && load_mlfq_config(mlfq_config_file, &parsed_config));
-        
-        MLFQScheduler mlfq_sched;
-        mlfq_sched.num_queues = parsed_config.num_queues;
-        mlfq_sched.boost_period = parsed_config.boost_interval;
-        mlfq_sched.queues = (MLFQQueue*)malloc(mlfq_sched.num_queues * sizeof(MLFQQueue));
-        
-        for(int i = 0; i < mlfq_sched.num_queues; i++) {
-            mlfq_sched.queues[i].level = i;
-            mlfq_sched.queues[i].time_quantum = parsed_config.time_quantums[i];
-            mlfq_sched.queues[i].allotment = parsed_config.allotments[i];
+    
+    struct {
+        const char* name;
+        int* flag;
+    } scheduler_flags[] = {
+        {"FCFS", &run_fcfs},
+        {"SJF", &run_sjf},
+        {"STCF", &run_stcf},
+        {"RR", &run_rr},
+        {"MLFQ", &run_mlfq},
+        {NULL, NULL}
+    };
+    
+    for (int i = 0; scheduler_flags[i].name != NULL; i++) {
+        if (*scheduler_flags[i].flag || run_all) {
+            void* scheduler_config = NULL;
+            
+            if (strcmp(scheduler_flags[i].name, "MLFQ") == 0) {
+                MLFQ_Config parsed_config;
+                
+                parsed_config.num_queues = 3;
+                parsed_config.time_quantums = (int*)malloc(3 * sizeof(int));
+                parsed_config.time_quantums[0] = 10;
+                parsed_config.time_quantums[1] = 30;
+                parsed_config.time_quantums[2] = -1;
+                
+                parsed_config.allotments = (int*)malloc(3 * sizeof(int));
+                parsed_config.allotments[0] = 50;
+                parsed_config.allotments[1] = 150;
+                parsed_config.allotments[2] = -1;
+                
+                parsed_config.boost_interval = 200;
+                
+                int allocated = (strlen(mlfq_config_file) > 0 && 
+                                load_mlfq_config(mlfq_config_file, &parsed_config));
+                
+                MLFQScheduler mlfq_sched;
+                mlfq_sched.num_queues = parsed_config.num_queues;
+                mlfq_sched.boost_period = parsed_config.boost_interval;
+                mlfq_sched.queues = (MLFQQueue*)malloc(mlfq_sched.num_queues * sizeof(MLFQQueue));
+                
+                for(int j = 0; j < mlfq_sched.num_queues; j++) {
+                    mlfq_sched.queues[j].time_quantum = parsed_config.time_quantums[j];
+                    mlfq_sched.queues[j].allotment = parsed_config.allotments[j];
+                }
+                
+                scheduler_config = &mlfq_sched;
+                
+                if (run_scheduler(scheduler_flags[i].name, current_processes, original_processes,
+                                num_processes, time_quantum, scheduler_config,
+                                &metrics_array[metrics_count], compare_mode) == 0) {
+                    metrics_count++;
+                }
+                
+                free(mlfq_sched.queues);
+                if (allocated) {
+                    free(parsed_config.time_quantums);
+                    free(parsed_config.allotments);
+                }
+            } else {
+                if (run_scheduler(scheduler_flags[i].name, current_processes, original_processes,
+                                num_processes, time_quantum, NULL,
+                                &metrics_array[metrics_count], compare_mode) == 0) {
+                    metrics_count++;
+                }
+            }
         }
-
-        SchedulerState state = { .processes = current_processes, .num_processes = num_processes, .current_time = 0 };
-        
-        if (compare_mode) suppress_output();
-        if (schedule_mlfq(&state, &mlfq_sched) == 0) {
-            if (compare_mode) restore_output();
-            calculate_metrics(&metrics_array[metrics_count], current_processes, num_processes, "MLFQ");
-            metrics_array[metrics_count].context_switches = get_last_context_switches(num_processes);
-            if (!compare_mode) print_metrics(&metrics_array[metrics_count], current_processes);
-            metrics_count++;
-        } else if (compare_mode) restore_output();
-
-        free(mlfq_sched.queues);
-        if (allocated) { free(parsed_config.time_quantums); free(parsed_config.allotments); }
     }
 
     if (metrics_count > 1) print_comparative_analysis(metrics_array, metrics_count, input_filename);

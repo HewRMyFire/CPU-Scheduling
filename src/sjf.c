@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include "scheduler.h"
 #include "engine.h"
+#include "utils.h"
 
 static void enqueue_sjf(SchedulerState *state, Process *p) {
     int i;
@@ -19,13 +20,11 @@ static void enqueue_sjf(SchedulerState *state, Process *p) {
 
 static void dispatch_sjf(SchedulerState *state) {
     if (state->current_running == NULL && state->rq_size > 0) {
-        Process *p = state->ready_queue[state->rq_front];
-        state->rq_front = (state->rq_front + 1) % state->num_processes;
-        state->rq_size--;
+        Process *p;
+        dequeue_ready_queue(state, &p);
 
-        state->current_running = p;
-        if (p->start_time == -1) p->start_time = state->current_time;
-        p->state = STATE_RUNNING;
+        set_process_running(p, state);
+        init_process_start_time(p, state);
         
         push_event(&state->event_queue, state->current_time + p->burst_time, EVENT_COMPLETION, p);
     }
@@ -37,22 +36,13 @@ static void sjf_arrival(SchedulerState *state, Process *p) {
 }
 
 static void sjf_completion(SchedulerState *state, Process *p) {
-    p->finish_time = state->current_time;
-    p->state = STATE_FINISHED;
-    p->remaining_time = 0;
-    state->current_running = NULL;
+    process_completion_handler(state, p);
     dispatch_sjf(state);
 }
 
 int schedule_sjf(SchedulerState *state) {
-    state->current_time = 0; state->event_queue = NULL; state->current_running = NULL;
-    state->ready_queue = (Process **)malloc(state->num_processes * sizeof(Process *));
-    state->rq_front = 0; state->rq_rear = 0; state->rq_size = 0;
-    init_gantt_chart(&state->chart);
-
-    for (int i = 0; i < state->num_processes; i++) {
-        push_event(&state->event_queue, state->processes[i].arrival_time, EVENT_ARRIVAL, &state->processes[i]);
-    }
+    init_ready_queue_scheduler(state);
+    init_arrival_events(state);
 
     SchedulerOps ops = {
         .handle_arrival = sjf_arrival,
@@ -63,7 +53,6 @@ int schedule_sjf(SchedulerState *state) {
     
     simulate_scheduler(state, &ops);
 
-    print_gantt_chart(&state->chart);
-    free(state->ready_queue); free_gantt_chart(&state->chart);
+    finalize_scheduler(state);
     return 0;
 }

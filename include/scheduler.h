@@ -22,7 +22,6 @@ typedef struct {
 } SchedulerState;
 
 typedef struct {
-    int level;              
     int time_quantum;       
     int allotment;          
     Process **queue;        
@@ -51,5 +50,22 @@ int schedule_sjf(SchedulerState *state);
 int schedule_stcf(SchedulerState *state);
 int schedule_rr(SchedulerState *state, int time_quantum);
 int schedule_mlfq(SchedulerState *state, MLFQScheduler* scheduler);
+
+static inline void init_process_start_time(Process *p, SchedulerState *state) {
+    if (p->start_time == -1) {
+        p->start_time = state->current_time;
+    }
+}
+
+static inline void dequeue_ready_queue(SchedulerState *state, Process **p) {
+    *p = state->ready_queue[state->rq_front];
+    state->rq_front = (state->rq_front + 1) % state->num_processes;
+    state->rq_size--;
+}
+
+static inline void set_process_running(Process *p, SchedulerState *state) {
+    state->current_running = p;
+    p->state = STATE_RUNNING;
+}
 
 #endif

@@ -53,10 +53,6 @@ void calculate_metrics(SchedulingMetrics* metrics, Process* processes, int num_p
 void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
     printf("=== Metrics for %s ===\n", metrics->algorithm_name);
 
-    int convoy_detected = 0;
-    char convoy_pid[16] = "";
-    int convoy_wait_time = 0;
-
     for (int i = 0; i < metrics->num_processes; i++) {
         Process* p = &processes[i];
 
@@ -68,12 +64,6 @@ void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
         printf("  Turnaround Time:  %d - %d = %d\n", p->finish_time, p->arrival_time, p->turnaround_time);
         printf("  Waiting Time:         %d - %d = %d\n", p->turnaround_time, p->burst_time, p->waiting_time);
         printf("  Response Time:     %d - %d = %d\n\n", p->start_time, p->arrival_time, p->response_time);
-
-        if (p->waiting_time > p->burst_time && p->waiting_time > convoy_wait_time && p->burst_time > 0) {
-            convoy_detected = 1;
-            strcpy(convoy_pid, p->pid);
-            convoy_wait_time = p->waiting_time;
-        }
     }
 
     printf("--- Average Metrics ---\n");
@@ -81,8 +71,23 @@ void print_metrics(const SchedulingMetrics* metrics, Process* processes) {
     printf("Average Waiting Time:    %.2f\n", metrics->avg_waiting_time);
     printf("Average Response Time:   %.2f\n\n", metrics->avg_response_time);
 
-    if (convoy_detected && strcmp(metrics->algorithm_name, "FCFS") == 0) {
-        printf("Convoy effect detected: Process %s waited %d time units\n\n", convoy_pid, convoy_wait_time);
+    if (strcmp(metrics->algorithm_name, "FCFS") == 0) {
+        int convoy_detected = 0;
+        char convoy_pid[16] = "";
+        int convoy_wait_time = 0;
+
+        for (int i = 0; i < metrics->num_processes; i++) {
+            Process* p = &processes[i];
+            if (p->waiting_time > p->burst_time && p->waiting_time > convoy_wait_time && p->burst_time > 0) {
+                convoy_detected = 1;
+                strcpy(convoy_pid, p->pid);
+                convoy_wait_time = p->waiting_time;
+            }
+        }
+
+        if (convoy_detected) {
+            printf("Convoy effect detected: Process %s waited %d time units\n\n", convoy_pid, convoy_wait_time);
+        }
     }
 }
 

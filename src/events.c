@@ -1,6 +1,12 @@
 #include <stdlib.h>
 #include "events.h"
 
+static int should_insert_before(Event *existing, int new_time, EventType new_type) {
+    if (existing->time > new_time) return 1;
+    if (existing->time == new_time && existing->type > new_type) return 1;
+    return 0;
+}
+
 void push_event(Event **queue, int time, EventType type, Process *process) {
     Event *new_event = (Event *)malloc(sizeof(Event));
     new_event->time = time;
@@ -8,17 +14,14 @@ void push_event(Event **queue, int time, EventType type, Process *process) {
     new_event->process = process;
     new_event->next = NULL;
 
-    if (*queue == NULL || (*queue)->time > time || 
-       ((*queue)->time == time && (*queue)->type > type)) {
+    if (*queue == NULL || should_insert_before(*queue, time, type)) {
         new_event->next = *queue;
         *queue = new_event;
         return;
     }
 
     Event *current = *queue;
-    while (current->next != NULL) {
-        if (current->next->time > time) break;
-        if (current->next->time == time && current->next->type > type) break;
+    while (current->next != NULL && !should_insert_before(current->next, time, type)) {
         current = current->next;
     }
 
