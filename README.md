@@ -2,368 +2,202 @@
 
 A comprehensive educational simulator for CPU scheduling algorithms. This project implements and demonstrates five major scheduling algorithms used in modern operating systems, with detailed performance metrics and visual Gantt charts.
 
+## Group Members
+
+- **[Rainier RJ S. Espinal]**
+- **[Matthew F. Simpas]**
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
 - [Supported Algorithms](#supported-algorithms)
+- [Compilation and Building](#compilation-and-building)
+- [Usage Instructions](#usage-instructions)
+- [Example Commands & Expected Output](#example-commands--expected-output)
+- [Known Limitations & Assumptions](#known-limitations--assumptions)
 - [Project Structure](#project-structure)
-- [Building the Project](#building-the-project)
-- [Usage](#usage)
-  - [Basic Examples](#basic-examples)
-  - [Running Specific Algorithms](#running-specific-algorithms)
-  - [Comparison Mode](#comparison-mode)
-  - [Input File Format](#input-file-format)
-  - [MLFQ Configuration](#mlfq-configuration)
-- [Performance Metrics](#performance-metrics)
 - [MLFQ Design Details](#mlfq-design-details)
-- [Example Workloads](#example-workloads)
-- [Output Format](#output-format)
+
+---
 
 ## Overview
 
-This simulator provides a realistic implementation of CPU scheduling algorithms used in operating systems. It allows you to:
+This simulator provides a realistic implementation of CPU scheduling algorithms used in operating systems. It allows you to simulate different scheduling strategies, compare their performance on the same workload, visualize execution with Gantt charts, and analyze key scheduling metrics.
 
-- Simulate five different scheduling strategies
-- Compare their performance on the same workload
-- Visualize execution with Gantt charts
-- Analyze key scheduling metrics (turnaround time, response time, wait time)
-- Customize MLFQ (Multi-Level Feedback Queue) parameters
-
-Perfect for students learning operating systems or professionals analyzing scheduling behavior.
+---
 
 ## Features
 
-✅ **Multiple Scheduling Algorithms** - FCFS, SJF, STCF, Round Robin, and MLFQ
-✅ **Performance Metrics** - Turnaround time, response time, wait time, and CPU utilization
-✅ **Gantt Chart Visualization** - Clear visual representation of process execution timelines
-✅ **Comparison Mode** - Run all algorithms on the same workload simultaneously
-✅ **Custom Input** - Define processes via command-line or input files
-✅ **Configurable MLFQ** - Customize queues, time quanta, and boost periods
-✅ **Event-Driven Simulation** - Accurate simulation using event queues
+| Feature | Description |
+|---|---|
+| **Multiple Scheduling Algorithms** | FCFS, SJF, STCF, Round Robin, and MLFQ |
+| **Performance Metrics** | Turnaround time, response time, wait time, CPU utilization, and context switch tracking |
+| **Gantt Chart Visualization** | Clear visual representation of process execution timelines scaled dynamically |
+| **Comparison Mode** | Run all algorithms on the same workload simultaneously to output a comparative table |
+| **Custom Input** | Define processes via inline command-line arguments or dedicated input files |
+| **Configurable MLFQ** | Customize queues, time quanta, allotments, and boost periods via config files |
+| **Automated Testing** | Built-in bash scripts for regression testing across algorithm implementations |
+
+---
 
 ## Supported Algorithms
 
-### 1. **FCFS (First Come, First Served)**
-- Simplest scheduling algorithm
-- Processes execute in arrival order
-- Non-preemptive
-- **Use case:** Batch processing systems
+1. **FCFS (First Come, First Served):** Non-preemptive. Processes execute strictly in arrival order.
+2. **SJF (Shortest Job First):** Non-preemptive. Selects the waiting process with the smallest execution time.
+3. **STCF (Shortest Time To Completion First):** Preemptive SJF. Switches to newly arrived jobs if their remaining time is shorter than the current running job.
+4. **Round Robin (RR):** Preemptive. Time-sharing scheduler using a configurable time quantum (default is 30).
+5. **MLFQ (Multi-Level Feedback Queue):** Adaptive scheduler with 3 default priority queues, dynamic priority adjustments, and starvation prevention via periodic priority boosting.
 
-### 2. **SJF (Shortest Job First)**
-- Non-preemptive algorithm
-- Minimizes average waiting time
-- Requires knowledge of CPU burst time
-- **Drawback:** Long processes may starve
+---
 
-### 3. **STCF (Shortest Time To Completion First)**
-- Preemptive variant of SJF
-- Switches to shorter remaining jobs
-- Better with preemption overhead consideration
-- **Advantage:** Optimal average turnaround time
+## Compilation and Building
 
-### 4. **Round Robin (RR)**
-- Time-sharing scheduler
-- Preemptive with configurable time quantum
-- Fair processor access for all processes
-- **Use case:** Interactive systems (default in many OS)
+### Prerequisites
 
-### 5. **MLFQ (Multi-Level Feedback Queue)**
-- Adaptive, feedback-based scheduler
-- Separates processes by priority levels
-- Prevents process starvation with priority boosting
-- **Features:** 
-  - Multiple priority queues
-  - Dynamic priority adjustment based on behavior
-  - Configurable queue levels, time quanta, and boost intervals
-  - Optimized for mixed workloads
-- **See** [MLFQ Design](docs/mlfq_design.md) for detailed architecture
+- GCC compiler
+- Make
+- Linux/Unix environment (or WSL/MinGW on Windows)
+
+### Build Commands
+
+Navigate to the root directory of the project and run the following commands:
+
+```bash
+# Compile the entire simulator
+make all
+
+# Run the automated test suite to verify all algorithms work correctly
+make test
+
+# Clean all generated binaries and object files
+make clean
+```
+
+---
+
+## Usage Instructions
+
+The executable will be located in the `build/` directory.
+
+### Command-Line Arguments
+
+| Flag | Description |
+|---|---|
+| `--algorithm=<name>` or `-a` | Specify the algorithm: `FCFS`, `SJF`, `STCF`, `RR`, `MLFQ`, or `ALL` |
+| `--processes=<str>` or `-p` | Provide inline processes formatted as `PID:Arrival:Burst,...` |
+| `--input=<file>` or `-f` / `-i` | Specify a text file containing the workload |
+| `--quantum=<int>` or `-q` | Set the time quantum for Round Robin (Default: `30`) |
+| `--mlfq-config=<file>` or `-m` | Provide a custom MLFQ configuration file |
+| `--compare` or `-c` | Run all algorithms silently and display a comparative performance table |
+
+### Input File Format
+
+Create a `.txt` file with one process per line containing: `ProcessID ArrivalTime BurstTime`
+
+```text
+A 0 240
+B 10 180
+C 20 150
+```
+
+---
+
+## Example Commands & Expected Output
+
+### 1. Basic Round Robin Execution
+
+**Command:**
+
+```bash
+./build/schedsim --algorithm=RR --quantum=50 --processes="P1:0:100,P2:10:40"
+```
+
+**Expected Output:**
+
+```text
+Running Round Robin (RR) Scheduler...
+=== Gantt Chart ===
+Scale: Each character represents ~3 time units
+[----------------][-----][----------------][-----]
+0                50    90               140   150
+
+=== Metrics for RR (q=50) ===
+Process P1:
+  Arrival Time:           0
+  Burst Time:             100
+  Finish Time:            150
+  Turnaround Time:  150 - 0 = 150
+  Waiting Time:         150 - 100 = 50
+  Response Time:     0 - 0 = 0
+
+Process P2:
+  Arrival Time:           10
+  Burst Time:             40
+  Finish Time:            90
+  Turnaround Time:  90 - 10 = 80
+  Waiting Time:         80 - 40 = 40
+  Response Time:     50 - 10 = 40
+
+--- Average Metrics ---
+Average Turnaround Time: 115.00
+Average Waiting Time:    45.00
+Average Response Time:   20.00
+```
+
+### 2. Comparison Mode
+
+**Command:**
+
+```bash
+./build/schedsim --compare --input=tests/workload1.txt
+```
+
+**Expected Output:**
+
+```text
+=== Algorithm Comparison for workload1.txt ===
+
+Algorithm  | Avg TT | Avg WT | Avg RT | Context Switches
+-----------|--------|--------|--------|------------------
+FCFS       |  385.0 |  235.0 |  235.0 |                4
+SJF        |  325.0 |  175.0 |  175.0 |                4
+STCF       |  305.0 |  155.0 |   80.0 |                7
+RR (q=30)  |  345.0 |  195.0 |  125.0 |               25
+MLFQ       |  315.0 |  165.0 |   90.0 |               18
+```
+
+---
+
+## Known Limitations & Assumptions
+
+- **Maximum Process Limit:** The simulator hardcodes a maximum of `100` processes (`MAX_PROCESSES` in `main.c`). Inputs exceeding this limit will be truncated.
+- **Process ID Length:** PIDs are limited to a maximum of `15` characters.
+- **Strict CPU-Bound Simulation:** The simulator assumes processes are strictly CPU-bound. It does not explicitly model I/O blocking states or distinct I/O bursts. I/O behavior must be approximated by splitting a single application into multiple discrete "processes" with delayed arrival times.
+- **Zero Overhead Context Switching:** The time taken to swap processes (context switch overhead) is assumed to be `0` time units.
+- **Non-Preemptive Limitations:** FCFS and SJF cannot be interrupted once scheduled, meaning a massive process arriving at time 0 will lock the CPU and create a convoy effect.
+- **Integer Time Units:** All arrival times, burst times, and quanta must be whole integers.
+
+---
 
 ## Project Structure
 
 ```
 .
-├── Makefile                 # Build configuration
-├── README.md               # This file
-├── build/                  # Compiled binaries and objects
-│   └── schedsim           # Executable
-├── docs/
-│   └── mlfq_design.md     # Detailed MLFQ architecture documentation
-├── include/               # Header files
-│   ├── engine.h           # Simulation engine
-│   ├── events.h           # Event management
-│   ├── gantt.h            # Gantt chart generation
-│   ├── metrics.h          # Performance metrics calculation
-│   ├── parser.h           # Input parsing
-│   ├── process.h          # Process data structures
-│   ├── scheduler.h        # Scheduler definitions
-│   └── utils.h            # Utility functions
-├── src/                   # Implementation files
-│   ├── engine.c           # Core simulation engine
-│   ├── events.c           # Event queue management
-│   ├── fcfs.c             # FCFS implementation
-│   ├── gantt.c            # Gantt chart rendering
-│   ├── main.c             # CLI and entry point
-│   ├── metrics.c          # Metrics calculation
-│   ├── mlfq.c             # MLFQ implementation
-│   ├── parser.c           # Input parser
-│   ├── process.c          # Process management
-│   ├── rr.c               # Round Robin implementation
-│   ├── sjf.c              # SJF implementation
-│   ├── stcf.c             # STCF implementation
-│   └── utils.c            # Utility functions
-└── tests/
-    └── workload1.txt      # Example workload file
+├── src/          # Core simulation engine, algorithm implementations, and metrics calculations
+├── include/      # Header files mapping the data structures (Process, SchedulerState, Event)
+├── tests/        # Example workloads and bash scripts for automated validation
+└── docs/         # Expanded design documentation (e.g., MLFQ architecture)
 ```
 
-## Building the Project
-
-### Prerequisites
-- GCC compiler
-- Make
-- Linux/Unix environment (or compatible terminal on Windows)
-
-### Compilation
-
-```bash
-# Compile the project
-make
-
-# Build output
-Build successful! Run with: ./build/schedsim --algorithm=FCFS --processes="A:0:240"
-
-# Clean build artifacts
-make clean
-```
-
-**Compiler Flags Used:**
-- `-Wall -Wextra -Wpedantic` - Enable all warnings
-- `-Iinclude` - Include header directory
-- `-g` - Debug symbols
-- `-MMD -MP` - Dependency generation
-
-## Usage
-
-### Basic Examples
-
-#### Run Single Algorithm with Inline Processes
-```bash
-./build/schedsim --algorithm=FCFS --processes="A:0:240,B:10:180,C:20:150"
-```
-
-Format: `PID:ArrivalTime:BurstTime,PID:ArrivalTime:BurstTime,...`
-
-#### Run Round Robin with Custom Time Quantum
-```bash
-./build/schedsim --algorithm=RR --quantum=5 --processes="A:0:100,B:5:80"
-```
-
-#### Run MLFQ Scheduler
-```bash
-./build/schedsim --algorithm=MLFQ --processes="A:0:240,B:10:180"
-```
-
-#### Run from Input File
-```bash
-./build/schedsim --algorithm=SJF --input=tests/workload1.txt
-```
-
-### Running Specific Algorithms
-
-```bash
-# Run FCFS only
-./build/schedsim --algorithm=FCFS --processes="A:0:100,B:5:50,C:10:75"
-
-# Run STCF only
-./build/schedsim --algorithm=STCF --processes="A:0:100,B:5:50"
-
-# Run all algorithms on same workload
-./build/schedsim --algorithm=ALL --processes="A:0:100,B:5:50,C:10:75"
-```
-
-### Comparison Mode
-
-Compare all algorithms side-by-side with a summary table:
-
-```bash
-./build/schedsim --compare --processes="A:0:240,B:10:180,C:20:150,D:25:80,E:30:130"
-```
-
-**Output includes:**
-- Individual algorithm Gantt charts
-- Performance metrics summary table
-- Statistical analysis
-
-### Input File Format
-
-Create a text file with processes (one per line):
-```
-ProcessID ArrivalTime BurstTime
-A 0 240
-B 10 180
-C 20 150
-D 25 80
-E 30 130
-```
-
-Run with:
-```bash
-./build/schedsim --algorithm=MLFQ --input=tests/workload1.txt
-```
-
-### MLFQ Configuration
-
-By default, MLFQ uses:
-- **Queues:** 3 levels
-- **Time Quanta:** 10, 30 time units
-- **Allotments:** Based on algorithm parameters
-- **Boost Interval:** 200 time units
-
-To use a custom config:
-```bash
-./build/schedsim --algorithm=MLFQ --processes="A:0:240" --mlfq-config=custom_mlfq.conf
-```
-
-**Configuration file format:**
-```
-num_queues 3
-time_quantums 2 4 8
-allotments 2 8 16
-boost_interval 20
-```
-
-## Performance Metrics
-
-The simulator calculates and displays:
-
-- **Turnaround Time** - Total time from arrival to completion (includes wait + execution)
-- **Response Time** - Time from arrival to first execution
-- **Wait Time** - Total time process spends in ready queue
-- **CPU Utilization** - Percentage of time CPU is executing (vs idle)
-- **Throughput** - Number of processes completed per unit time
+---
 
 ## MLFQ Design Details
 
-### Architecture Overview
-
-The Multi-Level Feedback Queue implements a sophisticated scheduling strategy designed to provide:
-- **Responsiveness** for interactive processes
-- **Efficiency** for CPU-bound tasks
-- **Fairness** through priority boosting
-
-### Key Design Decisions
-
-#### Three-Tier Queue Structure
-- **Queue 0 (Highest Priority):** Newly arrived and interactive processes (short bursts)
-- **Queue 1 (Medium Priority):** Processes requiring moderate CPU time
-- **Queue 2 (Lowest Priority):** Long-running, CPU-bound tasks
-
-#### Time Quantum Scaling
-- **Queue 0:** 10 time units (responsive to interactive tasks)
-- **Queue 1:** 30 time units (balanced)
-- **Queue 2:** Flexible (accommodates long-running jobs)
-
-#### Priority Demotion
-- Processes that exceed their allotment at a level are moved to the next lower queue
-- Prevents high-priority processes from monopolizing the CPU
-
-#### Starvation Prevention
-- **Priority Boost:** Every N time units, all processes are promoted back to Queue 0
-- Ensures fairness and prevents indefinite starvation
-- Default boost interval: 200 time units
-
-### Performance Under Mixed Workloads
-
-The design was validated against realistic workloads combining:
-- Short interactive jobs (40-80 time units)
-- Medium background tasks (90-150 time units)
-- Long-running CPU-bound jobs (180-240 time units)
-
-**Empirical Results:**
-- ✅ Short jobs complete quickly (high responsiveness)
-- ✅ Natural job filtering through queue levels
-- ✅ Long jobs eventually receive CPU time (no starvation)
-- ✅ Reduced context-switching overhead for heavy processes
-
-For complete MLFQ analysis, see [MLFQ Design Documentation](docs/mlfq_design.md).
-
-## Example Workloads
-
-### Workload 1: Mixed Processes (Default Test Case)
-Located in `tests/workload1.txt`:
-```
-A 0 240    # Arrives immediately, CPU intensive
-B 10 180   # Short delay, moderate load
-C 20 150   # Medium delay, moderate load
-D 25 80    # Medium delay, light load
-E 30 130   # Later arrival, moderate load
-```
-
-**Expected Behavior:**
-- FCFS: Processes execute in order, long wait times for later arrivals
-- SJF: D executes early, then A completes first due to ordering
-- STCF: D completes first (shortest remaining), responsive to new arrivals
-- RR: Fair round-robin execution, good interactive response
-- MLFQ: Short jobs get priority, long jobs eventually complete
-
-### Running the Example
-```bash
-./build/schedsim --algorithm=ALL --input=tests/workload1.txt
-./build/schedsim --compare --input=tests/workload1.txt
-```
-
-## Output Format
-
-### Gantt Chart
-```
-FCFS Gantt Chart:
-+----+----+----+----+----+
-| A  | B  | C  | D  | E  |
-+----+----+----+----+----+
-0   240  420  570  650  780
-```
-
-### Metrics Table
-```
-Algorithm | Avg Turnaround | Avg Response | Avg Wait | CPU Util
-----------|----------------|--------------|----------|----------
-FCFS      | 385.00         | 154.00      | 235.00  | 98.72%
-SJF       | 325.00         | 104.00      | 175.00  | 98.72%
-STCF      | 305.00         | 80.00       | 155.00  | 98.72%
-RR        | 345.00         | 125.00      | 195.00  | 98.72%
-MLFQ      | 315.00         | 90.00       | 165.00  | 98.72%
-```
-
-## Command-Line Reference
-
-```
-Options:
-  --algorithm=<name>      Scheduling algorithm: FCFS, SJF, STCF, RR, MLFQ, ALL
-  --processes=<str>       Inline processes: 'PID:Arrival:Burst,...'
-  --input=<file> / -f     Load processes from file
-  --quantum=<int> / -q    Time quantum for Round Robin (default: 30)
-  --mlfq-config=<file>    MLFQ configuration file path
-  --compare / -c          Compare all algorithms with metrics table
-  -h                      Display help message
-```
-
-## Notes
-
-- **Preemption:** STCF and RR use preemption; FCFS and SJF are non-preemptive
-- **Arrival Times:** Processes can have staggered arrivals; use time 0 for immediate arrival
-- **Burst Times:** Must be positive integers representing CPU time needed
-- **Quantum Size:** Affects RR and MLFQ performance; typically 5-50 time units
-- **Boost Interval:** MLFQ boost period should be tuned based on workload characteristics
-
-## Educational Value
-
-This simulator is designed to help students understand:
-- Trade-offs between scheduling algorithms
-- Impact of preemption on performance
-- Starvation and fairness issues
-- Feedback-based scheduler design
-- Performance metric analysis
+> See `docs/` for the full MLFQ architecture documentation.
 
 ## License
 
-Educational project for CMSC 125 - Operating Systems
+Educational project for **CMSC 125 – Operating Systems**.
