@@ -83,6 +83,26 @@ else
     TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 
+echo -e "${BLUE}Running Test 9: Comparison Mode (workload4)${NC}"
+TESTS_RUN=$((TESTS_RUN + 1))
+if $BINARY --compare --input="$TESTS_DIR/workload4.txt"; then
+    echo -e "${GREEN}✓ PASSED${NC}\n"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}✗ FAILED${NC}\n"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
+echo -e "${BLUE}Running Test 10: Comparison Mode (workload5)${NC}"
+TESTS_RUN=$((TESTS_RUN + 1))
+if $BINARY --compare --input="$TESTS_DIR/workload5.txt"; then
+    echo -e "${GREEN}✓ PASSED${NC}\n"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "${RED}✗ FAILED${NC}\n"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
 echo -e "${BLUE}=== Test Summary ===${NC}"
 echo "Total Tests: $TESTS_RUN"
 echo -e "Passed: ${GREEN}$TESTS_PASSED${NC}"
