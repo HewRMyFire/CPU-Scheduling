@@ -11,6 +11,7 @@ typedef struct GanttSegment {
 typedef struct {
     GanttSegment* head;
     GanttSegment* tail;
+    int dispatch_count;
 } GanttChart;
 
 void init_gantt_chart(GanttChart* chart);
@@ -18,6 +19,6 @@ void add_gantt_segment(GanttChart* chart, const char* pid, int start_time, int e
 void print_gantt_chart(const GanttChart* chart);
 void free_gantt_chart(GanttChart* chart);
 
-int get_last_context_switches(int num_processes);
+int get_last_context_switches(const GanttChart* chart, int num_processes);
 
 #endif

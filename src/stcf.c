@@ -3,25 +3,16 @@
 #include "engine.h"
 #include "utils.h"
 
-static void enqueue_stcf(SchedulerState *state, Process *p) {
-    int i;
-    for (i = 0; i < state->rq_size; i++) {
-        int idx = (state->rq_front + i) % state->num_processes;
-        if (state->ready_queue[idx]->remaining_time > p->remaining_time) break;
-    }
-    for (int j = state->rq_size; j > i; j--) {
-        state->ready_queue[(state->rq_front + j) % state->num_processes] = 
-            state->ready_queue[(state->rq_front + j - 1) % state->num_processes];
-    }
-    state->ready_queue[(state->rq_front + i) % state->num_processes] = p;
-    state->rq_rear = (state->rq_front + state->rq_size + 1) % state->num_processes;
-    state->rq_size++;
+// Comparison function for STCF: sort by remaining time
+static int compare_remaining_time(const Process* a, const Process* b) {
+    if (a->remaining_time < b->remaining_time) return -1;
+    if (a->remaining_time > b->remaining_time) return 1;
+    return 0;
 }
 
 static void dispatch_stcf(SchedulerState *state) {
-    if (state->current_running == NULL && state->rq_size > 0) {
-        Process *p;
-        dequeue_ready_queue(state, &p);
+    if (state->current_running == NULL && queue_size(state) > 0) {
+        Process *p = queue_dequeue(state);
 
         set_process_running(p, state);
         init_process_start_time(p, state);
@@ -39,11 +30,11 @@ static void stcf_arrival(SchedulerState *state, Process *p) {
         if (p->remaining_time < current_rem) {
             cancel_process_events(&state->event_queue, state->current_running);
             state->current_running->remaining_time = current_rem;
-            enqueue_stcf(state, state->current_running);
+            queue_enqueue_sorted(state, state->current_running, compare_remaining_time);
             state->current_running = NULL;
         }
     }
-    enqueue_stcf(state, p);
+    queue_enqueue_sorted(state, p, compare_remaining_time);
     dispatch_stcf(state);
 }
 

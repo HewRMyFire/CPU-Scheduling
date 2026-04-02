@@ -34,12 +34,21 @@ This simulator provides a realistic implementation of CPU scheduling algorithms 
 | Feature | Description |
 |---|---|
 | **Multiple Scheduling Algorithms** | FCFS, SJF, STCF, Round Robin, and MLFQ |
-| **Performance Metrics** | Turnaround time, response time, wait time, CPU utilization, and context switch tracking |
-| **Gantt Chart Visualization** | Clear visual representation of process execution timelines scaled dynamically |
-| **Comparison Mode** | Run all algorithms on the same workload simultaneously to output a comparative table |
+| **Performance Metrics** | Turnaround time, response time, wait time, context switch tracking |
+| **Gantt Chart Visualization** | Clean, scalable visual representation of process execution timelines with automatic scaling for large workloads |
+| **Comparison Mode** | Run all algorithms on the same workload simultaneously to output a comparative performance table |
 | **Custom Input** | Define processes via inline command-line arguments or dedicated input files |
 | **Configurable MLFQ** | Customize queues, time quanta, allotments, and boost periods via config files |
 | **Automated Testing** | Built-in bash scripts for regression testing across algorithm implementations |
+
+---
+
+## Recent Improvements
+
+- **Enhanced Gantt Chart Display** — Improved visual clarity with proper scaling for long workloads, eliminating padding overflow issues
+- **Refactored Command-Line Parsing** — Moved argument parsing to `parser` module for better separation of concerns
+- **Improved Code Encapsulation** — Round Robin time quantum now properly isolated within `SchedulerState` struct, eliminating dangling pointer issues
+- **State Management** — Cleaner architecture with explicit state handling through structures rather than hidden global variables
 
 ---
 
@@ -112,39 +121,60 @@ C 20 150
 **Command:**
 
 ```bash
-./build/schedsim --algorithm=RR --quantum=50 --processes="P1:0:100,P2:10:40"
+./build/schedsim --algorithm=RR --quantum=4 --processes="A:0:12,B:2:10,C:4:8,D:6:6"
 ```
 
 **Expected Output:**
 
 ```text
 Running Round Robin (RR) Scheduler...
-=== Gantt Chart ===
-Scale: Each character represents ~3 time units
-[----------------][-----][----------------][-----]
-0                50    90               140   150
 
-=== Metrics for RR (q=50) ===
-Process P1:
+┌─ GANTT CHART ─────────────────────────────────────────────┐
+  Total Time: 36 units
+  Processes: A B C D A B C A D B 
+├────────────────────────────────────────────────────────────┤
+  [AAAA][BBBB][CCCC][DDDD][AAAA][BBBB][CCCC][AAAA][DD][BB]
+  +-----+-----+-----+-----+-----+-----+-----+-----+---+---
+  0     4     8     12    16    20    24    28    32  34  36
+└────────────────────────────────────────────────────────────┘
+
+=== Metrics for RR (q=4) ===
+Process A:
   Arrival Time:           0
-  Burst Time:             100
-  Finish Time:            150
-  Turnaround Time:  150 - 0 = 150
-  Waiting Time:         150 - 100 = 50
+  Burst Time:             12
+  Finish Time:            32
+  Turnaround Time:  32 - 0 = 32
+  Waiting Time:         32 - 12 = 20
   Response Time:     0 - 0 = 0
 
-Process P2:
-  Arrival Time:           10
-  Burst Time:             40
-  Finish Time:            90
-  Turnaround Time:  90 - 10 = 80
-  Waiting Time:         80 - 40 = 40
-  Response Time:     50 - 10 = 40
+Process B:
+  Arrival Time:           2
+  Burst Time:             10
+  Finish Time:            36
+  Turnaround Time:  36 - 2 = 34
+  Waiting Time:         34 - 10 = 24
+  Response Time:     4 - 2 = 2
+
+Process C:
+  Arrival Time:           4
+  Burst Time:             8
+  Finish Time:            28
+  Turnaround Time:  28 - 4 = 24
+  Waiting Time:         24 - 8 = 16
+  Response Time:     8 - 4 = 4
+
+Process D:
+  Arrival Time:           6
+  Burst Time:             6
+  Finish Time:            34
+  Turnaround Time:  34 - 6 = 28
+  Waiting Time:         28 - 6 = 22
+  Response Time:     16 - 6 = 10
 
 --- Average Metrics ---
-Average Turnaround Time: 115.00
-Average Waiting Time:    45.00
-Average Response Time:   20.00
+Average Turnaround Time: 29.50
+Average Waiting Time:    20.50
+Average Response Time:   4.00
 ```
 
 ### 2. Comparison Mode
@@ -186,11 +216,73 @@ MLFQ       |  315.0 |  165.0 |   90.0 |               18
 
 ```
 .
-├── src/          # Core simulation engine, algorithm implementations, and metrics calculations
-├── include/      # Header files mapping the data structures (Process, SchedulerState, Event)
-├── tests/        # Example workloads and bash scripts for automated validation
-└── docs/         # Expanded design documentation (e.g., MLFQ architecture)
+├── src/
+│   ├── main.c              # Entry point and scheduler orchestration
+│   ├── parser.c            # Command-line argument parsing and input file loading
+│   ├── engine.c            # Core simulation event loop
+│   ├── gantt.c             # Gantt chart tracking and visualization
+│   ├── metrics.c           # Performance metrics calculation
+│   ├── fcfs.c              # First Come, First Served implementation
+│   ├── sjf.c               # Shortest Job First implementation
+│   ├── stcf.c              # Shortest Time To Completion First implementation
+│   ├── rr.c                # Round Robin implementation
+│   ├── mlfq.c              # Multi-Level Feedback Queue implementation
+│   ├── process.c           # Process structure and operations
+│   ├── events.c            # Event queue management
+│   ├── scheduler_registry.c # Algorithm registration and lookup
+│   └── utils.c             # Utility functions
+├── include/                # Header files
+│   ├── scheduler.h         # Core data structures (SchedulerState, Process, etc.)
+│   ├── parser.h            # Command-line parsing interface
+│   ├── gantt.h             # Gantt chart interface
+│   └── ...                 # Other module headers
+├── tests/                  # Example workloads and test scripts
+│   ├── workload*.txt       # Pre-configured process workloads
+│   ├── test_all_algorithms.sh
+│   └── run_workload_tests.sh
+├── docs/                   # Design documentation
+│   └── mlfq_design.md      # MLFQ architecture details
+└── Makefile                # Build configuration
 ```
+
+---
+
+## MLFQ Design Details
+
+> See `docs/` for the full MLFQ architecture documentation.
+
+---
+
+## Code Architecture & Design Decisions
+
+### 1. Command-Line Argument Parsing
+
+The `parser` module (`parser.h` / `parser.c`) centralizes all command-line handling:
+- `CommandLineArgs` struct encapsulates all CLI options
+- `parse_command_line_args()` handles getopt processing
+- Separates parsing logic from main execution flow
+
+### 2. State Management
+
+- **SchedulerState** struct contains all scheduler state including:
+  - `time_quantum` for Round Robin (isolated value, not pointer)
+  - `algo_data` for algorithm-specific configurations
+  - Gantt chart tracking via `chart` member
+  - Ready queue and event queue management
+
+### 3. Gantt Chart Design
+
+- **GanttChart** struct tracks `dispatch_count` directly (no hidden static globals)
+- Segments are linked-list based for flexible process tracking
+- Dynamic scaling based on total_time to maintain readability
+- Clean output format eliminated side pipes to prevent overflow on long workloads
+
+### 4. Round Robin Quantum Isolation
+
+Recent refactoring fixed a design issue:
+- **Before**: Stored address of stack variable (`&time_quantum`)
+- **After**: Copies value directly to `SchedulerState.time_quantum`
+- Ensures safe access throughout simulation lifecycle
 
 ---
 

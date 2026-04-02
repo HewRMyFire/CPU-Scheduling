@@ -13,7 +13,15 @@ void* safe_malloc(size_t size);
 void init_ready_queue_scheduler(SchedulerState *state);
 void init_arrival_events(SchedulerState *state);
 void process_completion_handler(SchedulerState *state, Process *p);
-void enqueue_ready_queue_fifo(SchedulerState *state, Process *p);
+
+// Queue abstraction layer
+void queue_enqueue_fifo(SchedulerState *state, Process *p);
+Process* queue_dequeue(SchedulerState *state);
+Process* queue_peek(SchedulerState *state);
+void queue_enqueue_sorted(SchedulerState *state, Process *p, int (*compare)(const Process*, const Process*));
+int queue_size(SchedulerState *state);
+void queue_clear(SchedulerState *state);
+
 void finalize_scheduler(SchedulerState *state);
 
 #endif

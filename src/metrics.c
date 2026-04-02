@@ -6,7 +6,8 @@
 void calculate_metrics(SchedulingMetrics* metrics, Process* processes, int num_processes, const char* algo_name) {
     if (num_processes == 0) return;
 
-    metrics->algorithm_name = algo_name;
+    strncpy(metrics->algorithm_name, algo_name, sizeof(metrics->algorithm_name) - 1);
+    metrics->algorithm_name[sizeof(metrics->algorithm_name) - 1] = '\0';
     metrics->num_processes = num_processes;
 
     metrics->total_turnaround_time = 0;

@@ -3,7 +3,7 @@
 #include "process.h"
 
 typedef struct {
-    const char* algorithm_name;
+    char algorithm_name[64];  // Store name directly, not pointer
     int num_processes;
 
     double avg_turnaround_time;

@@ -4,9 +4,8 @@
 #include "utils.h"
 
 static void dispatch_fcfs(SchedulerState *state) {
-    if (state->current_running == NULL && state->rq_size > 0) {
-        Process *p;
-        dequeue_ready_queue(state, &p);
+    if (state->current_running == NULL && queue_size(state) > 0) {
+        Process *p = queue_dequeue(state);
 
         set_process_running(p, state);
         init_process_start_time(p, state);
@@ -16,7 +15,7 @@ static void dispatch_fcfs(SchedulerState *state) {
 }
 
 static void fcfs_arrival(SchedulerState *state, Process *p) {
-    enqueue_ready_queue_fifo(state, p);
+    queue_enqueue_fifo(state, p);
     dispatch_fcfs(state);
 }
 

@@ -9,13 +9,13 @@ void simulate_scheduler(SchedulerState *state, SchedulerOps *ops) {
         int all_done = 1;
         for (int i = 0; i < state->num_processes; i++) {
             if (state->processes[i].state != STATE_FINISHED) {
-                all_done = 0; 
+                all_done = 0;
                 break;
             }
         }
         if (all_done && evt->type == EVENT_PRIORITY_BOOST) { 
-            free(evt); 
-            continue; 
+            free(evt);
+            continue;
         }
 
         if (state->current_time < evt->time) {

@@ -18,7 +18,8 @@ typedef struct {
     int rq_rear;
     int rq_size;
     
-    void *algo_data;
+    int time_quantum;       // For Round Robin scheduler
+    void *algo_data;        // For other algorithms
 } SchedulerState;
 
 typedef struct {
@@ -55,12 +56,6 @@ static inline void init_process_start_time(Process *p, SchedulerState *state) {
     if (p->start_time == -1) {
         p->start_time = state->current_time;
     }
-}
-
-static inline void dequeue_ready_queue(SchedulerState *state, Process **p) {
-    *p = state->ready_queue[state->rq_front];
-    state->rq_front = (state->rq_front + 1) % state->num_processes;
-    state->rq_size--;
 }
 
 static inline void set_process_running(Process *p, SchedulerState *state) {

@@ -4,11 +4,10 @@
 #include "utils.h"
 
 static void dispatch_rr(SchedulerState *state) {
-    int time_quantum = *(int*)state->algo_data;
+    int time_quantum = state->time_quantum;
 
-    if (state->current_running == NULL && state->rq_size > 0) {
-        Process *p;
-        dequeue_ready_queue(state, &p);
+    if (state->current_running == NULL && queue_size(state) > 0) {
+        Process *p = queue_dequeue(state);
 
         set_process_running(p, state);
         init_process_start_time(p, state);
@@ -23,7 +22,7 @@ static void dispatch_rr(SchedulerState *state) {
 }
 
 static void rr_arrival(SchedulerState *state, Process *p) {
-    enqueue_ready_queue_fifo(state, p);
+    queue_enqueue_fifo(state, p);
     dispatch_rr(state);
 }
 
@@ -32,7 +31,7 @@ static void rr_quantum_expire(SchedulerState *state, Process *p) {
     p->remaining_time -= elapsed;
     state->current_running = NULL;
     
-    enqueue_ready_queue_fifo(state, p);
+    queue_enqueue_fifo(state, p);
     dispatch_rr(state);
 }
 
@@ -49,7 +48,8 @@ int schedule_rr(SchedulerState *state, int time_quantum) {
     state->rq_front = 0;
     state->rq_rear = 0;
     state->rq_size = 0;
-    state->algo_data = &time_quantum;
+    state->time_quantum = time_quantum;
+    state->algo_data = NULL;
     init_gantt_chart(&state->chart);
 
     init_arrival_events(state);
